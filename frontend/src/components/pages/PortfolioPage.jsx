@@ -304,9 +304,9 @@ export function PortfolioPage({ isActive = false, totals = {}, products = [] }) 
             ticks: {
               color: '#6a9cbf',
               font: { size: 9 },
-              maxRotation: 0,  
-              minRotation: 0,   
-              autoSkip: false 
+              maxRotation: 0,
+              minRotation: 0,
+              autoSkip: false
             }
           },
           y: {
@@ -462,7 +462,26 @@ export function PortfolioPage({ isActive = false, totals = {}, products = [] }) 
           <div class="card-title">Portfolio Summary Table <span class="card-badge">5 PRODUCTS</span></div>
           <table class="data-table">
             <thead><tr><th>Product</th><th>Sanction (Cr)</th><th>O/S (Cr)</th><th>Int Rate</th><th>% Share</th><th>Band</th></tr></thead>
-            <tbody id="portFullTable"></tbody>
+            <tbody>
+              {products.map((p, index) => (
+                <tr key={index}>
+                  <td>{p.zprd_type} - {p.zprd_desc}</td>
+                  <td>{(p.zsanction_amt / 1e7).toFixed(2)}</td>
+                  <td>{(p.zos_amt / 1e7).toFixed(2)}</td>
+                  <td>{p.zinterest_rate}%</td>
+                  <td>
+                    {((p.zos_amt / (totals.total_os_amt || 1)) * 100).toFixed(2)}%
+                  </td>
+                  <td>
+                    {p.zinterest_rate >= 10
+                      ? "High"
+                      : p.zinterest_rate >= 7
+                        ? "Medium"
+                        : "Low"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
           </table>
         </div>
       </div>

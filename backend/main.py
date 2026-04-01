@@ -435,12 +435,13 @@ def calculate_cof_dashboard(filters: dict, raw_data=None):
     products_map: dict[str, dict] = {}
     lenders_map:  dict[str, float] = {}
     maturity_map: dict[str, float] = {}
-    borrowers_map: dict[str, float] = {} 
+    borrowers_map: dict[str, dict] = {} 
     portfolios_map: dict[str, dict] = {}
     sanction_vs_os_map: dict[str, dict] = {}
     customer_set: set[str] = set()     
     asset_classification_map: dict[str, float] = {}
     product_bp_map: dict[str, dict[str, float]] = {}
+    bp_summary_map: dict[str, dict[str, float]] = {}
     all_bp_groups: set[str] = set()
     lv_fixed_b = lv_float_b = 0.0
     lv_sec_b = lv_uns_b = lv_oth_b = 0.0
@@ -467,6 +468,7 @@ def calculate_cof_dashboard(filters: dict, raw_data=None):
         sanction_no = str(row.get("Sanction No") or "")
         sanction_amt = _to_float(row.get("Sanc Amt") or "")
         cpty = str(row.get("zcounterpty") or "")
+        bp_group = str(row.get("BP Grp Name") or "Others")
         asset_class = str(row.get("Asset Classification") or "")
         borrower = str(row.get("Customer Name")) 
         portfolio = str(row.get("Portfolio Desc"))
@@ -499,6 +501,15 @@ def calculate_cof_dashboard(filters: dict, raw_data=None):
             product_bp_map[pdesc][bp_group] = 0.0
 
         product_bp_map[pdesc][bp_group] += os_amt
+
+        if bp_group not in bp_summary_map:
+            bp_summary_map[bp_group] = {
+            "os_amt": 0.0,
+            "sanction_amt": 0.0
+        }
+
+        bp_summary_map[bp_group]["os_amt"] += os_amt
+        bp_summary_map[bp_group]["sanction_amt"] += sanction_amt
 
         # product aggregation
         if ptype not in products_map:
@@ -549,7 +560,16 @@ def calculate_cof_dashboard(filters: dict, raw_data=None):
         # lender aggregation
         lenders_map[cpty] = lenders_map.get(cpty, 0.0) + closing
         # Borrower's aggregation
-        borrowers_map[borrower] = borrowers_map.get(borrower, 0.0) + os_amt
+        if borrower not in borrowers_map:
+            borrowers_map[borrower] = {
+                "os_amt": 0.0,
+                "sanction_amt": 0.0,
+                "intrest_rate": 0.0
+            }
+        borrowers_map[borrower]["os_amt"] += os_amt
+        borrowers_map[borrower]["interest_rate"] = interest_rate
+        borrowers_map[borrower]["sanction_amt"] += sanction_amt
+
         if portfolio not in portfolios_map:
             portfolios_map[portfolio] = {
                 "os_amt": 0.0,
@@ -663,7 +683,18 @@ def calculate_cof_dashboard(filters: dict, raw_data=None):
                 }
                 for v in sanction_vs_os_map.values()
     ]    
-
+    bp_summary = sorted(
+    [
+        {
+            "bp_group": k,
+            "os_amt": round(v["os_amt"], 2),
+            "sanction_amt": round(v["sanction_amt"], 2)
+        }
+        for k, v in bp_summary_map.items()
+    ],
+    key=lambda x: x["os_amt"],
+    reverse=True
+    )
     # ── sorted product list ────────────────────────────────────────────────
     products = sorted(products_map.values(),
                       key=lambda p: p["zclosing_amt"], reverse=True)
@@ -684,14 +715,29 @@ def calculate_cof_dashboard(filters: dict, raw_data=None):
         [
             {
                 "zborrower": name,
-                "os_amt": round(os, 2),
-                "os_percent": round((os / total_os) * 100, 2)
+                 "os_amt": round(vals["os_amt"], 2),
+                "sanction_amt": round(vals["sanction_amt"], 2),
+                "os_percent": round((vals["os_amt"] / total_os) * 100, 2)
             }
-            for name, os in borrowers_map.items()
+            for name, vals in borrowers_map.items()
         ],
         key=lambda x: x["os_amt"],
         reverse=True
     )[:5]
+    top_borrowers = sorted(
+        [
+            {
+                "zborrower": name,
+                "zinterest_rate": vals.get("interest_rate", 0.0),                
+                "os_amt": round(vals["os_amt"], 2),
+                "sanction_amt": round(vals["sanction_amt"], 2),
+                "os_percent": round((vals["os_amt"] / total_os) * 100, 2)
+            }
+            for name, vals in borrowers_map.items()
+        ],
+        key=lambda x: x["os_amt"],
+        reverse=True
+    )
     # Top 5 Portfolios 
     top_portfolios = sorted(
         [
@@ -824,11 +870,13 @@ def calculate_cof_dashboard(filters: dict, raw_data=None):
             "maturity":     maturity_map,
             "transactions": transaction_rows,
             "borrowers":   top_borrowers_five,
+            "borrowers_full": top_borrowers,
             "totals":       totals,           
             "portfolios":   top_portfolios,         
             "asset_classification": asset_classification_summary, 
             "sanctionVsOs": sanction_vs_os,
             "productBpExposure": product_bp_exposure,
+            "bpSummary": bp_summary,
         },
 
         "row_count": len(rows),

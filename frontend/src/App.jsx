@@ -34,7 +34,8 @@ function App() {
   const [activePage, setActivePage] = useState("overview");
   const [isLoading,  setIsLoading]  = useState(true);
   const [loadError,  setLoadError]  = useState("");
-  const [reportState, setReportState] = useState({ totals: {}, lenders: [], products: [], borrowers: [], portfolios: [], assets: [], sanctionVsOs: [], productBpExposure: [] });
+  const [reportState, setReportState] = useState({ totals: {}, lenders: [], products: [], borrowers: [], portfolios: [], assets: [], sanctionVsOs: [], productBpExposure: [],   bpSummary: [], borrowers_full: [] 
+ });
 
   useEffect(() => {
     if (auth.status !== "valid") return undefined;
@@ -93,6 +94,8 @@ function App() {
             assets: Array.isArray(rs.asset_classification) ? rs.asset_classification : [],
             sanctionVsOs: Array.isArray(rs.sanctionVsOs) ? rs.sanctionVsOs : [],
             productBpExposure : Array.isArray(rs.productBpExposure ) ? rs.productBpExposure : [],
+            bpSummary: Array.isArray(rs.bpSummary) ? rs.bpSummary : [],
+            borrowers_full: Array.isArray(rs.borrowers_full) ? rs.borrowers_full : [],
           });
           bootCofDashboard(dashboard);
         }
@@ -143,6 +146,8 @@ function App() {
         <BorrowersPage 
         isActive = {activePage === "borrower"}
         totals={reportState.totals}
+        bpSummary={reportState.bpSummary}
+        borrowers_full={reportState.borrowers_full}
         />
         <MaturityPage isActive={activePage === "maturity"} />
         <TransactionsPage
