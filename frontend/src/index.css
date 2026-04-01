@@ -2199,3 +2199,130 @@ header {
     height: auto !important;
   }
 }
+#chart-tooltip {
+  position: fixed;
+  z-index: 9000;
+  pointer-events: none;
+  font-family: "Inter", sans-serif;
+  opacity: 0;
+  transform: translateY(6px) scale(0.97);
+  transition:
+    opacity 0.18s,
+    transform 0.18s;
+  min-width: 190px;
+  max-width: 260px;
+}
+
+#chart-tooltip.tt-visible {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.tt-inner {
+  background: rgba(255, 255, 255, 0.97);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(204, 224, 245, 0.8);
+  border-radius: 14px;
+  box-shadow:
+    0 16px 40px rgba(21, 101, 192, 0.14),
+    0 4px 12px rgba(21, 101, 192, 0.08);
+  overflow: hidden;
+}
+
+[data-theme="dark"] .tt-inner {
+  background: rgba(10, 22, 40, 0.96);
+  border: 1px solid rgba(30, 136, 229, 0.22);
+}
+
+.tt-header {
+  padding: 10px 14px 8px;
+  border-bottom: 1px solid rgba(204, 224, 245, 0.5);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.tt-header-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.tt-bar-wrap {
+  height: 3px;
+  background: rgba(204, 224, 245, 0.4);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-top: 10px;
+}
+
+.tt-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.35s;
+}
+
+.tt-caret {
+  width: 0;
+  height: 0;
+  border-left: 7px solid transparent;
+  border-right: 7px solid transparent;
+  border-top: 7px solid rgba(255, 255, 255, 0.97);
+  position: absolute;
+  bottom: -7px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.tt-title {
+  font-family: "Inter", sans-serif;
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  flex: 1;
+}
+
+.tt-body {
+  padding: 10px 14px 12px;
+}
+
+.tt-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 0;
+  border-bottom: 1px solid rgba(204, 224, 245, 0.3);
+}
+
+.tt-row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.tt-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.tt-label-text {
+  flex: 1;
+  font-size: 0.74rem;
+  color: var(--text-sub);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tt-value {
+  font-family: "Inter", sans-serif;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+}

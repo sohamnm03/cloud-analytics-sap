@@ -13,7 +13,8 @@ export function BorrowersPage({ isActive = false, totals = {}, borrowers = [], b
   const custChartInstanceRef = useRef(null);
   const loanOsChartRef = useRef(null);
   const loanOsChartInstanceRef = useRef(null);
-
+  const intDueChartRef = useRef(null);
+  const intDueChartInstanceRef = useRef(null);
   const initCustomerChart = (borrowers_full) => {
     if (!custChartRef.current || !borrowers_full?.length) return;
 
@@ -212,7 +213,70 @@ export function BorrowersPage({ isActive = false, totals = {}, borrowers = [], b
       }
     });
   };
+  const initInterestDueChart = (borrowers_full) => {
+    if (!intDueChartRef.current || !borrowers_full?.length) return;
 
+    if (intDueChartInstanceRef.current) {
+      intDueChartInstanceRef.current.destroy();
+    }
+
+    const ctx = intDueChartRef.current.getContext("2d");
+
+    const sorted = [...borrowers_full].sort(
+      (a, b) => toNumber(b.int_due_amt) - toNumber(a.int_due_amt)
+    );
+
+    const COLORS = [
+      "#42a5f5", "#66bb6a", "#ffa726", "#ab47bc",
+      "#ef5350", "#26c6da", "#d4e157", "#8d6e63",
+      "#5c6bc0", "#26a69a"
+    ];
+
+    intDueChartInstanceRef.current = new Chart(ctx, {
+      type: "bar",
+      data: {
+        labels: sorted.map(b =>
+          b.zborrower.split(" ").slice(0, 2).join(" ")
+        ),
+        datasets: [
+          {
+            label: "Interest Due (Cr)",
+            data: sorted.map(b => toNumber(b.int_due_amt) / 1e7), // convert to Cr
+            backgroundColor: COLORS.map(c => c + "44"),
+            borderColor: COLORS,
+            borderWidth: 1.5,
+            borderRadius: 6,
+            maxBarThickness: 38
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: true }
+        },
+        scales: {
+          x: {
+            grid: { display: false },
+            ticks: {
+              color: "#6a9cbf",
+              font: { size: 9 },
+              maxRotation: 30
+            }
+          },
+          y: {
+            grid: { color: "#eaf3fb" },
+            ticks: {
+              color: "#6a9cbf",
+              font: { size: 10 },
+              callback: (v) => `${v} Cr`
+            }
+          }
+        }
+      }
+    });
+  };
   const switchBorrowerChart = (newMode) => {
     setMode(newMode);
 
@@ -236,6 +300,8 @@ export function BorrowersPage({ isActive = false, totals = {}, borrowers = [], b
     if (isActive && borrowers_full?.length) {
       initCustomerChart(borrowers_full);
       initLoanOsChart(borrowers_full);
+      initInterestDueChart(borrowers_full);
+
 
     }
 
@@ -251,6 +317,10 @@ export function BorrowersPage({ isActive = false, totals = {}, borrowers = [], b
       if (loanOsChartInstanceRef.current) {
         loanOsChartInstanceRef.current.destroy();
         loanOsChartInstanceRef.current = null;
+      }
+      if (intDueChartInstanceRef.current) {
+        intDueChartInstanceRef.current.destroy();
+        intDueChartInstanceRef.current = null;
       }
     };
   }, [bpSummary, isActive, borrowers_full]);
@@ -382,7 +452,7 @@ export function BorrowersPage({ isActive = false, totals = {}, borrowers = [], b
         </div>
         <div class="chart-card">
           <div class="chart-header"><div><div class="chart-title">Facilities Count per Customer</div><div class="chart-subtitle">NUMBER OF ACTIVE DISBURSEMENTS</div></div></div>
-          <div class="chart-wrap h260"><canvas id="borrCustFacBar"></canvas></div>
+          <div class="chart-wrap h260"><canvas ref={intDueChartRef}></canvas></div>
         </div>
       </div>
 

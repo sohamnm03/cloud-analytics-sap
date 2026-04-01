@@ -65,6 +65,13 @@ let txnFiltered = [];
 let ftrCurrentRow = null;
 let transactionCharts = [];
 let activateTimer = null;
+const ENABLE_EXTERNAL_TOOLTIP = true;
+
+let ttEl = null;
+let ttTitle = null;
+let ttBody = null;
+let ttHeaderDot = null;
+let ttHideTimer = null;
 
 function cc(color, alpha = '26') {
   return `${color}${alpha}`;
@@ -435,8 +442,164 @@ function animateProgs() {
   });
 }
 
+function getTooltipElements() {
+  if (!ttEl || !document.body.contains(ttEl)) {
+    ttEl = document.getElementById('chart-tooltip');
+    ttTitle = document.getElementById('tt-title');
+    ttBody = document.getElementById('tt-body');
+    ttHeaderDot = document.getElementById('tt-header-dot');
+  }
+
+  if (!ttEl || !ttTitle || !ttBody) {
+    return null;
+  }
+
+  return { ttEl, ttTitle, ttBody, ttHeaderDot };
+}
+
+function resolveTooltipColor(value, index) {
+  const pickColor = (candidate) => {
+    if (!candidate) return null;
+    if (typeof candidate === 'string') {
+      return candidate;
+    }
+    if (Array.isArray(candidate)) {
+      return pickColor(candidate[index] || candidate[0]);
+    }
+    return null;
+  };
+
+  return pickColor(value?.borderColor) || pickColor(value?.backgroundColor) || '#1565c0';
+}
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
+function tooltipNumber(dataPoint, horizontal, circular) {
+  if (circular) {
+    return typeof dataPoint?.parsed === 'number' ? dataPoint.parsed : 0;
+  }
+  if (horizontal) {
+    return typeof dataPoint?.parsed?.x === 'number' ? dataPoint.parsed.x : 0;
+  }
+  return typeof dataPoint?.parsed?.y === 'number' ? dataPoint.parsed.y : 0;
+}
+
+function formatTooltipValue(value, label, valueSuffix) {
+  const text = String(label || '').toLowerCase();
+  const suffix = String(valueSuffix || '').trim();
+  if (text.includes('%') || text.includes('rate') || suffix === '%') {
+    return `${value.toFixed(2)}%`;
+  }
+  if (suffix.toLowerCase() === 'bps') {
+    return `${value.toFixed(2)} bps`;
+  }
+  if (suffix === '') {
+    return value.toFixed(2);
+  }
+  if (suffix.toLowerCase() === 'cr') {
+    return `₹${value.toFixed(2)} Cr`;
+  }
+  return `${value.toFixed(2)} ${suffix}`;
+}
+
+function renderExternalTooltip(context, valueSuffix = ' Cr') {
+  const tooltipElements = getTooltipElements();
+  if (!tooltipElements) {
+    return;
+  }
+
+  const { ttEl: tooltipNode, ttTitle: titleNode, ttBody: bodyNode, ttHeaderDot: headerDotNode } = tooltipElements;
+  const { chart, tooltip } = context;
+
+  if (!tooltip || tooltip.opacity === 0) {
+    if (ttHideTimer) {
+      clearTimeout(ttHideTimer);
+    }
+    ttHideTimer = window.setTimeout(() => {
+      tooltipNode.classList.remove('tt-visible');
+    }, 80);
+    return;
+  }
+
+  if (ttHideTimer) {
+    clearTimeout(ttHideTimer);
+    ttHideTimer = null;
+  }
+
+  titleNode.textContent = tooltip.title?.[0] || '';
+
+  const horizontal = chart?.config?.options?.indexAxis === 'y';
+  const circular = chart?.config?.type === 'doughnut' || chart?.config?.type === 'pie';
+  const dataPoints = tooltip.dataPoints || [];
+
+  let maxValue = 0;
+  dataPoints.forEach((point) => {
+    const absoluteValue = Math.abs(tooltipNumber(point, horizontal, circular));
+    if (absoluteValue > maxValue) {
+      maxValue = absoluteValue;
+    }
+  });
+
+  let firstColor = '#1565c0';
+  let rowsHtml = '';
+
+  dataPoints.forEach((point, index) => {
+    const dataset = point.dataset || {};
+    const color = resolveTooltipColor(dataset, point.dataIndex);
+    if (index === 0) {
+      firstColor = color;
+    }
+
+    const rawValue = tooltipNumber(point, horizontal, circular);
+    const label = dataset.label || 'Value';
+    const valueText = formatTooltipValue(rawValue, label, valueSuffix);
+    const barWidth = maxValue > 0 ? ((Math.abs(rawValue) / maxValue) * 100).toFixed(1) : '0.0';
+
+    rowsHtml += `<div class="tt-row"><div class="tt-dot" style="background:${color};"></div><span class="tt-label-text">${escapeHtml(label)}</span><span class="tt-value" style="color:${color};">${escapeHtml(valueText)}</span></div><div class="tt-bar-wrap"><div class="tt-bar-fill" style="width:${barWidth}%;background:linear-gradient(90deg,${color}cc,${color}44);"></div></div>`;
+  });
+
+  bodyNode.innerHTML = rowsHtml;
+
+  if (headerDotNode) {
+    headerDotNode.style.background = firstColor;
+    headerDotNode.style.boxShadow = `0 0 6px ${firstColor}99`;
+  }
+
+  const canvasRect = chart.canvas.getBoundingClientRect();
+  const tooltipWidth = tooltipNode.offsetWidth || 220;
+  const tooltipHeight = tooltipNode.offsetHeight || 100;
+  const viewportWidth = window.innerWidth;
+
+  let left = canvasRect.left + tooltip.caretX - (tooltipWidth / 2);
+  let top = canvasRect.top + tooltip.caretY - tooltipHeight - 14;
+
+  if (left < 8) left = 8;
+  if (left + tooltipWidth > viewportWidth - 8) {
+    left = viewportWidth - tooltipWidth - 8;
+  }
+  if (top < 8) {
+    top = canvasRect.top + tooltip.caretY + 14;
+  }
+
+  tooltipNode.style.left = `${left}px`;
+  tooltipNode.style.top = `${top}px`;
+  tooltipNode.classList.add('tt-visible');
+}
+
+function configureGlobalChartDefaults() {
+  Chart.defaults.plugins.tooltip.enabled = false;
+  Chart.defaults.plugins.tooltip.external = (context) => renderExternalTooltip(context, ' Cr');
+}
+
 function tooltipCfg(valueSuffix = ' Cr') {
-  return {
+  const baseConfig = {
     enabled: true,
     backgroundColor: 'rgba(255,255,255,0.97)',
     titleColor: '#2e6090',
@@ -452,7 +615,21 @@ function tooltipCfg(valueSuffix = ' Cr') {
       },
     },
   };
+
+  if (!ENABLE_EXTERNAL_TOOLTIP) {
+    return baseConfig;
+  }
+
+  return {
+    ...baseConfig,
+    enabled: false,
+    external(context) {
+      renderExternalTooltip(context, valueSuffix);
+    },
+  };
 }
+
+configureGlobalChartDefaults();
 
 function commonOptions(overrides = {}) {
   return {
