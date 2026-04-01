@@ -1,0 +1,609 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Treasury Analytics Debug</title>
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        background: #080d12;
+        font-family: monospace;
+        color: #ddeeff;
+        font-size: 11px;
+      }
+      #debug-panel {
+        position: fixed;
+        inset: 0;
+        background: #060b10;
+        display: flex;
+        flex-direction: column;
+        z-index: 9999;
+      }
+      #debug-toolbar {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+        padding: 8px 12px;
+        background: #0d1520;
+        border-bottom: 1px solid #1a2d42;
+        flex-shrink: 0;
+      }
+      #debug-toolbar span {
+        color: #00c8ff;
+        font-size: 10px;
+        letter-spacing: 1px;
+        flex: 1;
+      }
+      #debug-toolbar button {
+        background: #1a2d42;
+        border: 1px solid #2a4a66;
+        color: #ddeeff;
+        padding: 4px 10px;
+        border-radius: 3px;
+        cursor: pointer;
+        font-size: 10px;
+        font-family: monospace;
+      }
+      #debug-toolbar button:hover {
+        background: #2a4a66;
+      }
+      #debug-log {
+        flex: 1;
+        overflow-y: auto;
+        padding: 10px 12px;
+      }
+      .log-entry {
+        display: grid;
+        grid-template-columns: 60px 70px 1fr;
+        gap: 6px;
+        padding: 5px 0;
+        border-bottom: 1px solid #0d1a27;
+        line-height: 1.5;
+      }
+      .log-time {
+        color: #3a5a78;
+      }
+      .log-level {
+        font-weight: 600;
+        font-size: 9px;
+        padding-top: 2px;
+        text-transform: uppercase;
+      }
+      .info {
+        color: #00c8ff;
+      }
+      .success {
+        color: #00e5b0;
+      }
+      .warn {
+        color: #f5a623;
+      }
+      .error {
+        color: #e05a5a;
+      }
+      .network {
+        color: #8b7cf8;
+      }
+      .log-msg {
+        color: #aaccdd;
+        word-break: break-all;
+        white-space: pre-wrap;
+      }
+      .log-msg.error {
+        color: #e05a5a;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="debug-panel">
+      <div id="debug-toolbar">
+        <span>SAP ANALYTICS DEBUG</span>
+        <button onclick="clearLog()">CLEAR</button>
+        <button onclick="copyLog()">COPY ALL</button>
+        <button onclick="retryBoot()">RETRY</button>
+      </div>
+      <div id="debug-log"></div>
+    </div>
+
+    <script>
+      (function () {
+        "use strict";
+
+        var API_BASE =
+          "https://development.fsnxt.com/fsnxtbackend/api/gateway.php";
+        var REACT_APP_URL =
+          "https://development.fsnxt.com/fsnxtbackend/api/gateway.php";
+        var SHARED_SECRET =
+          "658ebbd2998e6e43dee75b64d23dc3f075a8a1bdfc08fa5fb85eba457e8782b6";
+
+        var SAP_SID = "DEV";
+        var SAP_CLIENT = "100";
+        var SAP_USER = "DEMO_USER";
+        var DASHBOARD = "cof_dashboard";
+
+        // var RAW_DATA_PAYLOAD = [];
+
+        var RAW_DATA_PAYLOAD = [
+          {
+            zprd_type: "15L",
+            zprd_desc: "Issue: Public Issue Cumulative",
+            zfacility: null,
+            zclass_id: 130023,
+            ztxn_no: null,
+            zcounterpty: "INVESTORS",
+            zref_rate: "",
+            zrate_type: "Fixed",
+            zstart_date: "09.10.2023",
+            zend_date: "09.10.2028",
+            ztxn_type: 300,
+            zopening_amt: 108046000,
+            zaddition_amt: 0,
+            zredempt_amt: 0,
+            zclosing_amt: 108046000,
+            zdays: 31,
+            zaccrual_amt: 21345541.22,
+            zwt_avg_amt: 108046000,
+            zavg_funds: 129391541.2,
+            zopen_eir: 8.1382,
+            zexit_eir: 8.1382,
+            zwt_int_amt: 746806.05,
+            zavg_rate_eir: 8.1382,
+            zavg_rate_papm: 7.8496,
+            zportfolio: 1000,
+            zportfo_desc: "Secured Liability",
+          },
+          {
+            zprd_type: "15K",
+            zprd_desc: "Issue: Public Issue Debentures",
+            zfacility: null,
+            zclass_id: 140094,
+            ztxn_no: null,
+            zcounterpty: "INVESTORS",
+            zref_rate: "",
+            zrate_type: "Fixed",
+            zstart_date: "09.10.2023",
+            zend_date: "09.10.2026",
+            ztxn_type: 300,
+            zopening_amt: 2053062000,
+            zaddition_amt: 0,
+            zredempt_amt: 0,
+            zclosing_amt: 2053062000,
+            zdays: 31,
+            zaccrual_amt: 51748412.05,
+            zwt_avg_amt: 2053062000,
+            zavg_funds: 2104810412,
+            zopen_eir: 8.1053,
+            zexit_eir: 8.1053,
+            zwt_int_amt: 14133125.82,
+            zavg_rate_eir: 8.1053,
+            zavg_rate_papm: 7.8189,
+            zportfolio: 106767600,
+            zportfo_desc: "Secured Liability",
+          },
+          {
+            zprd_type: "15J",
+            zprd_desc: "Partly Paid Debentures",
+            zfacility: null,
+            zclass_id: null,
+            ztxn_no: 1400068,
+            zcounterpty: "INVESTORS",
+            zref_rate: "",
+            zrate_type: "Fixed",
+            zstart_date: "06.08.2020",
+            zend_date: "03.08.2035",
+            ztxn_type: 200,
+            zopening_amt: 3010000000,
+            zaddition_amt: 0,
+            zredempt_amt: 0,
+            zclosing_amt: 3010000000,
+            zdays: 31,
+            zaccrual_amt: 111743569.9,
+            zwt_avg_amt: 3010000000,
+            zavg_funds: 3121743570,
+            zopen_eir: 7.5877,
+            zexit_eir: 7.5877,
+            zwt_int_amt: 19397100.79,
+            zavg_rate_eir: 7.5875,
+            zavg_rate_papm: 7.3358,
+            zportfolio: 2000,
+            zportfo_desc: "Unsecured Liability",
+          },
+          // more rows...
+        ];
+
+        var IS_GATEWAY = API_BASE.indexOf("gateway.php") !== -1;
+
+        function apiUrl(endpoint) {
+          return IS_GATEWAY
+            ? API_BASE + "?route=" + endpoint
+            : API_BASE + "/" + endpoint;
+        }
+
+        function frontendUrl(params) {
+          var qs = Object.keys(params)
+            .map(function (k) {
+              return k + "=" + encodeURIComponent(params[k]);
+            })
+            .join("&");
+          return IS_GATEWAY
+            ? API_BASE + "?route=app&" + qs
+            : REACT_APP_URL + "?" + qs;
+        }
+
+        var logEntries = [];
+
+        function ts() {
+          var d = new Date();
+          return (
+            d.getHours().toString().padStart(2, "0") +
+            ":" +
+            d.getMinutes().toString().padStart(2, "0") +
+            ":" +
+            d.getSeconds().toString().padStart(2, "0") +
+            "." +
+            d.getMilliseconds().toString().padStart(3, "0")
+          );
+        }
+
+        function log(level, msg) {
+          logEntries.push({ time: ts(), level: level, msg: msg });
+          var row = document.createElement("div");
+          row.className = "log-entry";
+          row.innerHTML =
+            '<span class="log-time">' +
+            ts() +
+            "</span>" +
+            '<span class="log-level ' +
+            level +
+            '">' +
+            level +
+            "</span>" +
+            '<span class="log-msg ' +
+            (level === "error" ? "error" : "") +
+            '">' +
+            esc(msg) +
+            "</span>";
+          var el = document.getElementById("debug-log");
+          el.appendChild(row);
+          el.scrollTop = el.scrollHeight;
+        }
+
+        function esc(s) {
+          return String(s)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;");
+        }
+
+        window.clearLog = function () {
+          document.getElementById("debug-log").innerHTML = "";
+          logEntries = [];
+        };
+
+        window.retryBoot = function () {
+          log("info", "RETRY");
+          boot();
+        };
+
+        window.copyLog = function () {
+          var text = logEntries
+            .map(function (e) {
+              return (
+                "[" +
+                e.time +
+                "] " +
+                e.level.toUpperCase().padEnd(7) +
+                " " +
+                e.msg
+              );
+            })
+            .join("\n");
+
+          try {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+              navigator.clipboard.writeText(text);
+              log("info", "Copied via clipboard API");
+              return;
+            }
+          } catch (e) {}
+
+          var ta = document.createElement("textarea");
+          ta.value = text;
+          ta.style.position = "fixed";
+          ta.style.top = "0";
+          document.body.appendChild(ta);
+          ta.focus();
+          ta.select();
+
+          try {
+            document.execCommand("copy");
+            log("info", "Copied via execCommand");
+          } catch (e) {
+            log("warn", "Copy failed - select text manually");
+          }
+
+          document.body.removeChild(ta);
+        };
+
+        function xhr(method, url, payload, authToken, callback) {
+          log("network", "-> " + method + " " + url);
+
+          if (payload) {
+            var safe = JSON.parse(JSON.stringify(payload));
+            if (safe.hmac_sig) {
+              safe.hmac_sig = safe.hmac_sig.substring(0, 8) + "...";
+            }
+            if (Array.isArray(safe.raw_data)) {
+              safe.raw_data = "[" + safe.raw_data.length + " rows omitted]";
+            }
+            log("info", "Payload: " + JSON.stringify(safe));
+          }
+
+          var req = new XMLHttpRequest();
+          var t0 = Date.now();
+
+          req.onreadystatechange = function () {
+            if (req.readyState !== 4) return;
+
+            var elapsed = Date.now() - t0;
+            var level =
+              req.status >= 200 && req.status < 300 ? "success" : "error";
+
+            log(level, "<- HTTP " + req.status + " (" + elapsed + "ms)");
+
+            var body = req.responseText || "";
+            if (body) {
+              try {
+                log(
+                  level,
+                  "Response: " + JSON.stringify(JSON.parse(body), null, 2),
+                );
+              } catch (e) {
+                log(level, "Response (raw): " + body.substring(0, 500));
+              }
+            } else {
+              log("warn", "Response body is empty");
+            }
+
+            callback(req.status, body);
+          };
+
+          req.onerror = function () {
+            var elapsed = Date.now() - t0;
+            log("error", "XHR network error after " + elapsed + "ms");
+            log("error", "Possible causes:");
+            log("error", "1. Backend not running or unreachable");
+            log(
+              "error",
+              "2. CORS rejected - gateway missing Access-Control-Allow-Origin",
+            );
+            log("error", "3. SSL certificate issue");
+            callback(0, null);
+          };
+
+          req.ontimeout = function () {
+            log("error", "XHR timed out after 20s");
+            callback(0, null);
+          };
+
+          req.open(method, url, true);
+          req.timeout = 20000;
+          req.setRequestHeader("Content-Type", "application/json");
+
+          if (authToken) {
+            req.setRequestHeader("Authorization", "Bearer " + authToken);
+          }
+
+          try {
+            req.send(payload ? JSON.stringify(payload) : null);
+            log("info", "XHR sent - waiting for response...");
+          } catch (sendErr) {
+            log("error", "XHR send() threw: " + sendErr.message);
+            callback(0, null);
+          }
+        }
+
+        function computeHmac(message, secret, callback) {
+          if (!window.crypto || !window.crypto.subtle) {
+            log("error", "SubtleCrypto not available - cannot compute HMAC");
+            log(
+              "error",
+              "SAP browser may be running in a non-HTTPS context or old IE engine",
+            );
+            callback(null);
+            return;
+          }
+
+          var enc = new TextEncoder();
+
+          crypto.subtle
+            .importKey(
+              "raw",
+              enc.encode(secret),
+              { name: "HMAC", hash: "SHA-256" },
+              false,
+              ["sign"],
+            )
+            .then(function (key) {
+              return crypto.subtle.sign("HMAC", key, enc.encode(message));
+            })
+            .then(function (sig) {
+              var hex = Array.from(new Uint8Array(sig))
+                .map(function (b) {
+                  return b.toString(16).padStart(2, "0");
+                })
+                .join("");
+              callback(hex);
+            })
+            .catch(function (e) {
+              log("error", "HMAC computation failed: " + e.message);
+              callback(null);
+            });
+        }
+
+        function boot() {
+          log("info", "BOOT STARTED");
+          log("info", "Time:       " + new Date().toISOString());
+          log(
+            "info",
+            "Mode:       " +
+              (IS_GATEWAY ? "GATEWAY - " + API_BASE : "DIRECT - " + API_BASE),
+          );
+          log("info", "SAP Env:    " + SAP_SID + " / " + SAP_CLIENT);
+          log("info", "User:       " + SAP_USER);
+          log("info", "Dashboard:  " + DASHBOARD);
+          log("info", "Rows:       " + RAW_DATA_PAYLOAD.length);
+          log("info", "User-Agent: " + navigator.userAgent);
+          log(
+            "info",
+            "Crypto:     " +
+              (window.crypto && window.crypto.subtle ? "YES" : "NO"),
+          );
+
+          var timestamp = Math.floor(Date.now() / 1000);
+
+          computeHmac(
+            SAP_SID + SAP_CLIENT + timestamp,
+            SHARED_SECRET,
+            function (hmacSig) {
+              if (!hmacSig) {
+                log("error", "Aborting - HMAC unavailable");
+                return;
+              }
+
+              log("success", "HMAC: " + hmacSig.substring(0, 16) + "...");
+
+              xhr(
+                "POST",
+                apiUrl("auth/token"),
+                {
+                  sap_sid: SAP_SID,
+                  sap_client: SAP_CLIENT,
+                  sap_user: SAP_USER,
+                  timestamp: timestamp,
+                  hmac_sig: hmacSig,
+                },
+                null,
+                function (status, body) {
+                  if (status === 0 || status < 200 || status >= 300) {
+                    log("error", "Auth failed - HTTP " + status);
+                    return;
+                  }
+
+                  var authData;
+                  try {
+                    authData = JSON.parse(body);
+                  } catch (e) {
+                    log("error", "Cannot parse auth response: " + e.message);
+                    return;
+                  }
+
+                  if (!authData.access_token) {
+                    log(
+                      "error",
+                      "No access_token in response. Keys: " +
+                        Object.keys(authData).join(", "),
+                    );
+                    return;
+                  }
+
+                  log(
+                    "success",
+                    "JWT received - expires_in: " + authData.expires_in + "s",
+                  );
+
+                  log(
+                    "info",
+                    "Storing SAP data server-side via /session/create...",
+                  );
+
+                  xhr(
+                    "POST",
+                    apiUrl("session/create"),
+                    {
+                      raw_data: RAW_DATA_PAYLOAD,
+                      dashboard: DASHBOARD,
+                      filters: {},
+                    },
+                    authData.access_token,
+                    function (sessStatus, sessBody) {
+                      if (
+                        sessStatus === 0 ||
+                        sessStatus < 200 ||
+                        sessStatus >= 300
+                      ) {
+                        log(
+                          "error",
+                          "Session create failed - HTTP " + sessStatus,
+                        );
+                        return;
+                      }
+
+                      var sessData;
+                      try {
+                        sessData = JSON.parse(sessBody);
+                      } catch (e) {
+                        log(
+                          "error",
+                          "Cannot parse session response: " + e.message,
+                        );
+                        return;
+                      }
+
+                      if (!sessData.session_id) {
+                        log(
+                          "error",
+                          "No session_id in response. Keys: " +
+                            Object.keys(sessData).join(", "),
+                        );
+                        return;
+                      }
+
+                      log("success", "Session created: " + sessData.session_id);
+                      log(
+                        "info",
+                        "Rows stored: " +
+                          sessData.row_count +
+                          " | Expires in: " +
+                          sessData.expires_in +
+                          "s",
+                      );
+
+                      var url = frontendUrl({
+                        token: authData.access_token,
+                        sid: SAP_SID,
+                        client: SAP_CLIENT,
+                        dashboard: DASHBOARD,
+                        session_id: sessData.session_id,
+                      });
+
+                      log("info", "Redirect: " + url.substring(0, 120) + "...");
+                      log("success", "Launching dashboard");
+
+                      setTimeout(function () {
+                        window.location.href = url;
+                      }, 800);
+                    },
+                  );
+                },
+              );
+            },
+          );
+        }
+
+        window.boot = boot;
+
+        if (document.readyState === "loading") {
+          document.addEventListener("DOMContentLoaded", boot);
+        } else {
+          boot();
+        }
+      })();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,17 @@
+{
+  "routes": [
+    {
+      "route": "/*",
+      "rewrite": "/index.html"
+    }
+  ],
+  "globalHeaders": {
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "ALLOW-FROM *",
+    "Cache-Control": "no-store, no-cache, must-revalidate",
+    "Referrer-Policy": "no-referrer"
+  },
+  "mimeTypes": {
+    ".js": "application/javascript"
+  }
+}

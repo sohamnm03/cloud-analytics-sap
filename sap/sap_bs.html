@@ -1,0 +1,439 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Treasury Analytics</title>
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+      }
+
+      body {
+        font-family: Arial, Helvetica, sans-serif;
+        background: radial-gradient(
+          circle at 50% 35%,
+          rgba(230, 240, 248, 0.95) 0%,
+          rgba(216, 228, 239, 0.9) 28%,
+          rgba(206, 219, 231, 0.86) 50%,
+          rgba(198, 211, 223, 0.82) 72%,
+          rgba(192, 204, 216, 0.8) 100%
+        );
+        color: #163457;
+        overflow: hidden;
+      }
+
+      .shell {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+      }
+
+      .card {
+        width: 100%;
+        max-width: 670px;
+        min-height: 180px;
+        background: rgba(255, 255, 255, 0.72);
+        border: 1px solid rgba(189, 206, 223, 0.85);
+        border-radius: 22px;
+        box-shadow: 0 18px 40px rgba(91, 126, 158, 0.18);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .content {
+        width: 100%;
+        padding: 34px 34px 30px 34px;
+      }
+
+      .eyebrow {
+        font-size: 13px;
+        line-height: 1.4;
+        color: #34506f;
+        margin-bottom: 12px;
+      }
+
+      .title {
+        font-size: 28px;
+        line-height: 1.2;
+        font-weight: 700;
+        color: #163457;
+        margin-bottom: 14px;
+      }
+
+      .message {
+        font-size: 16px;
+        line-height: 1.6;
+        color: #5d87ae;
+      }
+
+      .loading-wrap {
+        display: flex;
+        align-items: center;
+        gap: 18px;
+      }
+
+      .spinner {
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        border: 3px solid rgba(122, 156, 188, 0.25);
+        border-top-color: #4f7fa8;
+        animation: spin 0.8s linear infinite;
+        flex: 0 0 auto;
+      }
+
+      .error-state {
+        display: none;
+      }
+
+      .error-icon {
+        width: 42px;
+        height: 42px;
+        border-radius: 50%;
+        background: rgba(216, 102, 102, 0.12);
+        color: #b05252;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 22px;
+        font-weight: 700;
+        margin-bottom: 14px;
+      }
+
+      .helper {
+        margin-top: 10px;
+        font-size: 14px;
+        line-height: 1.6;
+        color: #6d8dad;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      @media (max-width: 640px) {
+        .card {
+          min-height: 170px;
+        }
+
+        .content {
+          padding: 26px 24px;
+        }
+
+        .title {
+          font-size: 24px;
+        }
+
+        .message {
+          font-size: 15px;
+        }
+
+        .loading-wrap {
+          align-items: flex-start;
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="shell">
+      <div class="card">
+        <div class="content">
+          <div id="loading-state">
+            <div class="loading-wrap">
+              <div class="spinner" aria-hidden="true"></div>
+              <div>
+                <div class="eyebrow" id="status-label">Secure session</div>
+                <div class="title" id="status-title">Authenticating...</div>
+                <div class="message" id="status-message">
+                  Please wait while Treasury Analytics securely connects to the
+                  cloud service.
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div id="error-state" class="error-state">
+            <div class="error-icon">!</div>
+            <div class="eyebrow">Session Error</div>
+            <div class="title" id="error-title">Unable to open dashboard</div>
+            <div class="message" id="error-message">
+              An unexpected error occurred while opening Treasury Analytics.
+            </div>
+            <div class="helper">
+              Please relaunch from SAP. If the issue persists, contact your
+              system administrator.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      (function () {
+        "use strict";
+
+        var API_BASE =
+          "https://development.fsnxt.com/fsnxtbackend/api/gateway.php";
+        var REACT_APP_URL =
+          "https://development.fsnxt.com/fsnxtbackend/api/gateway.php";
+        var SHARED_SECRET =
+          "658ebbd2998e6e43dee75b64d23dc3f075a8a1bdfc08fa5fb85eba457e8782b6";
+
+        var SAP_SID = "DEV";
+        var SAP_CLIENT = "100";
+        var SAP_USER = "DEMO_USER";
+        var DASHBOARD = "cof_dashboard";
+
+        var RAW_DATA_PAYLOAD = SAP_RAW_PAYLOAD;
+
+        var IS_GATEWAY = API_BASE.indexOf("gateway.php") !== -1;
+
+        function apiUrl(endpoint) {
+          return IS_GATEWAY
+            ? API_BASE + "?route=" + endpoint
+            : API_BASE + "/" + endpoint;
+        }
+
+        function frontendUrl(params) {
+          var qs = Object.keys(params)
+            .map(function (k) {
+              return k + "=" + encodeURIComponent(params[k]);
+            })
+            .join("&");
+
+          return IS_GATEWAY
+            ? API_BASE + "?route=app&" + qs
+            : REACT_APP_URL + "?" + qs;
+        }
+
+        function setLoadingState(label, title, message) {
+          var labelEl = document.getElementById("status-label");
+          var titleEl = document.getElementById("status-title");
+          var messageEl = document.getElementById("status-message");
+
+          if (labelEl) labelEl.textContent = label;
+          if (titleEl) titleEl.textContent = title;
+          if (messageEl) messageEl.textContent = message;
+        }
+
+        function showError(title, message) {
+          var loading = document.getElementById("loading-state");
+          var error = document.getElementById("error-state");
+          var titleEl = document.getElementById("error-title");
+          var messageEl = document.getElementById("error-message");
+
+          if (loading) loading.style.display = "none";
+          if (error) error.style.display = "block";
+          if (titleEl) titleEl.textContent = title;
+          if (messageEl) messageEl.textContent = message;
+        }
+
+        function xhr(method, url, payload, authToken, callback) {
+          var req = new XMLHttpRequest();
+
+          req.onreadystatechange = function () {
+            if (req.readyState !== 4) return;
+            callback(req.status, req.responseText || "");
+          };
+
+          req.onerror = function () {
+            callback(0, "");
+          };
+
+          req.ontimeout = function () {
+            callback(0, "");
+          };
+
+          req.open(method, url, true);
+          req.timeout = 20000;
+          req.setRequestHeader("Content-Type", "application/json");
+
+          if (authToken) {
+            req.setRequestHeader("Authorization", "Bearer " + authToken);
+          }
+
+          req.send(payload ? JSON.stringify(payload) : null);
+        }
+
+        function computeHmac(message, secret, callback) {
+          if (!window.crypto || !window.crypto.subtle) {
+            callback(null);
+            return;
+          }
+
+          var enc = new TextEncoder();
+
+          crypto.subtle
+            .importKey(
+              "raw",
+              enc.encode(secret),
+              { name: "HMAC", hash: "SHA-256" },
+              false,
+              ["sign"],
+            )
+            .then(function (key) {
+              return crypto.subtle.sign("HMAC", key, enc.encode(message));
+            })
+            .then(function (sig) {
+              var hex = Array.from(new Uint8Array(sig))
+                .map(function (b) {
+                  return b.toString(16).padStart(2, "0");
+                })
+                .join("");
+              callback(hex);
+            })
+            .catch(function () {
+              callback(null);
+            });
+        }
+
+        function parseJson(text) {
+          try {
+            return text ? JSON.parse(text) : {};
+          } catch (e) {
+            return null;
+          }
+        }
+
+        function boot() {
+          setLoadingState(
+            "Secure session",
+            "Authenticating...",
+            "Please wait while Treasury Analytics securely connects to the cloud service.",
+          );
+
+          var timestamp = Math.floor(Date.now() / 1000);
+
+          computeHmac(
+            SAP_SID + SAP_CLIENT + timestamp,
+            SHARED_SECRET,
+            function (hmacSig) {
+              if (!hmacSig) {
+                showError(
+                  "Secure session unavailable",
+                  "The browser could not initialize the secure authentication step.",
+                );
+                return;
+              }
+
+              xhr(
+                "POST",
+                apiUrl("auth/token"),
+                {
+                  sap_sid: SAP_SID,
+                  sap_client: SAP_CLIENT,
+                  sap_user: SAP_USER,
+                  timestamp: timestamp,
+                  hmac_sig: hmacSig,
+                },
+                null,
+                function (authStatus, authBody) {
+                  if (authStatus < 200 || authStatus >= 300) {
+                    showError(
+                      "Authentication failed",
+                      "The dashboard session could not be authenticated.",
+                    );
+                    return;
+                  }
+
+                  var authData = parseJson(authBody);
+                  if (!authData || !authData.access_token) {
+                    showError(
+                      "Authentication failed",
+                      "The cloud service returned an invalid authentication response.",
+                    );
+                    return;
+                  }
+
+                  setLoadingState(
+                    "Session preparation",
+                    "Preparing secure session...",
+                    "Your SAP data is being prepared for dashboard generation.",
+                  );
+
+                  xhr(
+                    "POST",
+                    apiUrl("session/create"),
+                    {
+                      raw_data: RAW_DATA_PAYLOAD,
+                      dashboard: DASHBOARD,
+                      filters: {},
+                    },
+                    authData.access_token,
+                    function (sessStatus, sessBody) {
+                      if (sessStatus < 200 || sessStatus >= 300) {
+                        showError(
+                          "Session setup failed",
+                          "The dashboard session could not be created.",
+                        );
+                        return;
+                      }
+
+                      var sessData = parseJson(sessBody);
+                      if (!sessData || !sessData.session_id) {
+                        showError(
+                          "Session setup failed",
+                          "The cloud service returned an invalid session response.",
+                        );
+                        return;
+                      }
+
+                      setLoadingState(
+                        "Insight generation",
+                        "Generating insights...",
+                        "Treasury Analytics is preparing your dashboard view.",
+                      );
+
+                      var url = frontendUrl({
+                        token: authData.access_token,
+                        sid: SAP_SID,
+                        client: SAP_CLIENT,
+                        dashboard: DASHBOARD,
+                        session_id: sessData.session_id,
+                      });
+
+                      setTimeout(function () {
+                        setLoadingState(
+                          "Dashboard launch",
+                          "Launching dashboard...",
+                          "Opening your analytics workspace.",
+                        );
+                      }, 300);
+
+                      setTimeout(function () {
+                        window.location.href = url;
+                      }, 900);
+                    },
+                  );
+                },
+              );
+            },
+          );
+        }
+
+        if (document.readyState === "loading") {
+          document.addEventListener("DOMContentLoaded", boot);
+        } else {
+          boot();
+        }
+      })();
+    </script>
+  </body>
+</html>

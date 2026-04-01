@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Treasury Analytics</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        background: #080d12;
+        font-family: sans-serif;
+      }
+      #status {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+        gap: 14px;
+        color: #3a5a78;
+        font-family: monospace;
+        font-size: 12px;
+        letter-spacing: 1px;
+      }
+      .spinner {
+        width: 28px;
+        height: 28px;
+        border: 2px solid #1a2d42;
+        border-top-color: #00c8ff;
+        border-radius: 50%;
+        animation: spin 0.7s linear infinite;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="status">
+      <div class="spinner"></div>
+      <div id="status-text">AUTHENTICATING…</div>
+    </div>
+
+    <script>
+      (function () {
+        "use strict";
+
+        // ── CONFIG: set before uploading to SMW0 ──────────────────────────────
+        // var API_BASE =
+        //   "https://sap-cloud-analytics-aah0gbcrf3ckgefc.centralindia-01.azurewebsites.net";
+        // var REACT_APP_URL =
+        //   "https://nice-river-0bd617d00.4.azurestaticapps.net";
+        var API_BASE = "http://localhost:8000";
+        var REACT_APP_URL = "http://localhost:5173";
+
+        // var SHARED_SECRET =
+        // "658ebbd2998e6e43dee75b64d23dc3f075a8a1bdfc08fa5fb85eba457e8782b6";
+        var SHARED_SECRET = "CHANGE_ME_IN_PRODUCTION";
+
+        // ── SAP CONTEXT ───────────────────────────────────────────────────────
+        // var SAP_SID = "SAP_SID_PLACEHOLDER"; // replaced by ABAP: sy-sysid
+        // var SAP_CLIENT = "SAP_CLIENT_PLACEHOLDER"; // replaced by ABAP: sy-mandt
+        // var SAP_USER = "SAP_USER_PLACEHOLDER"; // replaced by ABAP: sy-uname
+        var SAP_SID = "DEV";
+        var SAP_CLIENT = "100";
+        var SAP_USER = "DEMO_USER";
+        var DASHBOARD = "borrowings";
+
+        function setStatus(msg) {
+          var el = document.getElementById("status-text");
+          if (el) el.textContent = msg;
+        }
+
+        function showError(msg) {
+          document.getElementById("status").innerHTML =
+            '<div style="color:#e05a5a;max-width:380px;text-align:center;line-height:1.6;">' +
+            '<div style="font-size:24px;margin-bottom:12px;">⚠</div>' +
+            "<strong>Analytics Error</strong><br/>" +
+            msg +
+            "</div>";
+        }
+
+        async function computeHmac(message, secret) {
+          var enc = new TextEncoder();
+          var key = await crypto.subtle.importKey(
+            "raw",
+            enc.encode(secret),
+            { name: "HMAC", hash: "SHA-256" },
+            false,
+            ["sign"],
+          );
+          var sig = await crypto.subtle.sign("HMAC", key, enc.encode(message));
+          return Array.from(new Uint8Array(sig))
+            .map(function (b) {
+              return b.toString(16).padStart(2, "0");
+            })
+            .join("");
+        }
+
+        async function boot() {
+          try {
+            setStatus("AUTHENTICATING…");
+
+            var timestamp = Math.floor(Date.now() / 1000);
+            var hmacSig = await computeHmac(
+              SAP_SID + SAP_CLIENT + timestamp,
+              SHARED_SECRET,
+            );
+
+            var authRes = await fetch(API_BASE + "/auth/token", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                sap_sid: SAP_SID,
+                sap_client: SAP_CLIENT,
+                sap_user: SAP_USER,
+                timestamp: timestamp,
+                hmac_sig: hmacSig,
+              }),
+            });
+
+            if (!authRes.ok) {
+              var err = await authRes.json().catch(function () {
+                return {};
+              });
+              showError(
+                "Authentication failed: " + (err.detail || authRes.status),
+              );
+              return;
+            }
+
+            var authData = await authRes.json();
+            setStatus("LAUNCHING DASHBOARD…");
+
+            var url =
+              REACT_APP_URL +
+              "?token=" +
+              encodeURIComponent(authData.access_token) +
+              "&sid=" +
+              encodeURIComponent(SAP_SID) +
+              "&client=" +
+              encodeURIComponent(SAP_CLIENT) +
+              "&dashboard=" +
+              encodeURIComponent(DASHBOARD);
+
+            window.location.href = url;
+          } catch (ex) {
+            showError("Startup error: " + ex.message);
+          }
+        }
+
+        if (document.readyState === "loading") {
+          document.addEventListener("DOMContentLoaded", boot);
+        } else {
+          boot();
+        }
+      })();
+    </script>
+  </body>
+</html>
