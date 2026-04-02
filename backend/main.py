@@ -439,9 +439,15 @@ def calculate_cof_dashboard(filters: dict, raw_data=None):
     portfolios_map: dict[str, dict] = {}
     sanction_vs_os_map: dict[str, dict] = {}
     customer_set: set[str] = set()     
+    disb_set: set[str] = set()
+    currency_map: dict[str, float] = {}
     asset_classification_map: dict[str, float] = {}
     product_bp_map: dict[str, dict[str, float]] = {}
     bp_summary_map: dict[str, dict[str, float]] = {}
+    bp_product_map: dict[str, dict[str, float]] = {}
+    all_prd_types: set[str] = set()
+    top_disb_map: dict[str, dict] = {}
+    txn_type_map: dict[str, dict] = {}
     all_bp_groups: set[str] = set()
     lv_fixed_b = lv_float_b = 0.0
     lv_sec_b = lv_uns_b = lv_oth_b = 0.0
@@ -465,10 +471,15 @@ def calculate_cof_dashboard(filters: dict, raw_data=None):
         exp_amt   = _to_float(row.get("Exp Amt"))
         int_rate = _to_float(row.get("Interest Received"))
         interest_rate = _to_float(row.get("Int Rate"))
+        curr = str(row.get("Curr") or "")
+        interest_due   = _to_float(row.get("Interest Due"))
         sanction_no = str(row.get("Sanction No") or "")
+        disb_no = row.get("Dis No") or ""
         sanction_amt = _to_float(row.get("Sanc Amt") or "")
         cpty = str(row.get("zcounterpty") or "")
         bp_group = str(row.get("BP Grp Name") or "Others")
+        txn_type = str(row.get("Txn Type") or "")
+        txn_type_desc = str(row.get("Txn Type Desc") or "")
         asset_class = str(row.get("Asset Classification") or "")
         borrower = str(row.get("Customer Name")) 
         portfolio = str(row.get("Portfolio Desc"))
@@ -483,7 +494,8 @@ def calculate_cof_dashboard(filters: dict, raw_data=None):
         exit_eir = float(row.get("zexit_eir") or 0)
         avg_eir = float(row.get("zavg_rate_eir") or 0)
         avg_papm = float(row.get("zavg_rate_papm") or 0)
-   
+
+        currency_map[curr] = currency_map.get(curr, 0.0) + os_amt
         customer_set.add(borrower)                   
         total_loan_amt += loan_amt
         total_os_amt    += os_amt
@@ -505,11 +517,23 @@ def calculate_cof_dashboard(filters: dict, raw_data=None):
         if bp_group not in bp_summary_map:
             bp_summary_map[bp_group] = {
             "os_amt": 0.0,
-            "sanction_amt": 0.0
+            "sanction_amt": 0.0,
+            "interest_due": 0.0,
         }
 
         bp_summary_map[bp_group]["os_amt"] += os_amt
         bp_summary_map[bp_group]["sanction_amt"] += sanction_amt
+        bp_summary_map[bp_group]["interest_due"] += interest_due
+
+        all_prd_types.add(ptype)
+
+        if bp_group not in bp_product_map:
+            bp_product_map[bp_group] = {}
+
+        if ptype not in bp_product_map[bp_group]:
+            bp_product_map[bp_group][ptype] = 0.0
+
+        bp_product_map[bp_group][ptype] += os_amt
 
         # product aggregation
         if ptype not in products_map:
@@ -518,6 +542,8 @@ def calculate_cof_dashboard(filters: dict, raw_data=None):
                 "zprd_desc":    pdesc,
                 "zint_rec":    int_rate,
                 "zinterest_rate": interest_rate,
+                "zinterest_due": interest_due,
+                "zinterest_ratio": 0.0,
                 "zsanction_amt": 0.0,
                 "zdrawdown_rate": 0.0,
                 "zclosing_amt": 0.0,
@@ -549,7 +575,8 @@ def calculate_cof_dashboard(filters: dict, raw_data=None):
         p["zavg_funds"] += avg_f
         p["zwt_int_amt"] += wt_int
         p["zdrawdown_rate"] = round((p["zos_amt"] / p["zsanction_amt"]) * 100, 2)    
-        p["zexposure"] = round(p["zsanction_amt"] - p["zos_amt"], 2)        
+        p["zexposure"] = round(p["zsanction_amt"] - p["zos_amt"], 2)     
+        p["zinterest_ratio"] = round((p["zinterest_due"] / p["zos_amt"]) * 100, 2) if p["zos_amt"] > 0 else 0.0
         if avg_eir:
             p["zopen_eir_sum"] += open_eir
             p["zexit_eir_sum"] += exit_eir
@@ -564,19 +591,52 @@ def calculate_cof_dashboard(filters: dict, raw_data=None):
             borrowers_map[borrower] = {
                 "os_amt": 0.0,
                 "sanction_amt": 0.0,
-                "intrest_rate": 0.0
+                "intrest_rate": 0.0,
+                "interest_due": 0.0,
+                "utilization_rate": 0.0,
+                "bp_group": "" ,
+                "active_disb": 0,
+                
             }
+        if disb_no:  # string check
+            disb_set.add(str(disb_no))
+            borrowers_map[borrower]["active_disb"] += 1
         borrowers_map[borrower]["os_amt"] += os_amt
         borrowers_map[borrower]["interest_rate"] = interest_rate
         borrowers_map[borrower]["sanction_amt"] += sanction_amt
-
+        borrowers_map[borrower]["interest_due"] += interest_due
+        borrowers_map[borrower]["bp_group"] = bp_group
+        borrowers_map[borrower]["utilization_rate"] = round((borrowers_map[borrower]["os_amt"] / borrowers_map[borrower]["sanction_amt"]) * 100, 2) if borrowers_map[borrower]["sanction_amt"] > 0 else 0.0
         if portfolio not in portfolios_map:
             portfolios_map[portfolio] = {
                 "os_amt": 0.0,
                 "sanction_amt": 0.0
             }
         portfolios_map[portfolio]["os_amt"] += os_amt
-        portfolios_map[portfolio]["sanction_amt"] += sanction_amt         
+        portfolios_map[portfolio]["sanction_amt"] += sanction_amt   
+        # Txn Type grouping
+        if txn_type not in txn_type_map:
+            txn_type_map[txn_type] = {
+            "txn_type": txn_type,
+            "txn_type_desc": txn_type_desc,
+            "sanction_amt": 0.0,
+            "os_amt": 0.0
+        }
+
+        txn_type_map[txn_type]["sanction_amt"] += sanction_amt
+        txn_type_map[txn_type]["os_amt"] += os_amt
+
+        if disb_no:
+            if disb_no not in top_disb_map:
+                top_disb_map[disb_no] = {
+                    "disb_no": disb_no,
+                    "os_amt": 0.0,
+                    "sanction_amt": 0.0
+                }
+
+            top_disb_map[disb_no]["os_amt"] += os_amt
+            top_disb_map[disb_no]["sanction_amt"] += sanction_amt
+
         # rate / portfolio splits
         if "fixed" in rtype.lower():
             lv_fixed_b += closing
@@ -684,17 +744,37 @@ def calculate_cof_dashboard(filters: dict, raw_data=None):
                 for v in sanction_vs_os_map.values()
     ]    
     bp_summary = sorted(
+        [
+            {
+                "bp_group": bp,
+                "os_amt": round(vals["os_amt"], 2),
+                "sanction_amt": round(vals["sanction_amt"], 2),
+                "interest_due": round(vals["interest_due"], 2),
+                "products": [
+                    {
+                        "prd_type": prd,
+                        "os_amt": round(bp_product_map.get(bp, {}).get(prd, 0.0), 2)
+                    }
+                    for prd in all_prd_types  
+                ]
+            }
+            for bp, vals in bp_summary_map.items()
+        ],
+        key=lambda x: x["os_amt"],
+        reverse=True
+    )
+    currency_summary = sorted(
     [
         {
-            "bp_group": k,
-            "os_amt": round(v["os_amt"], 2),
-            "sanction_amt": round(v["sanction_amt"], 2)
+            "currency": curr,
+            "os_amt": round(amount, 2),
+            "os_percent": round((amount / (total_os_amt or 1)) * 100, 2)
         }
-        for k, v in bp_summary_map.items()
+        for curr, amount in currency_map.items()
     ],
     key=lambda x: x["os_amt"],
     reverse=True
-    )
+)
     # ── sorted product list ────────────────────────────────────────────────
     products = sorted(products_map.values(),
                       key=lambda p: p["zclosing_amt"], reverse=True)
@@ -728,10 +808,14 @@ def calculate_cof_dashboard(filters: dict, raw_data=None):
         [
             {
                 "zborrower": name,
+                "bp_group": vals.get("bp_group", ""),
                 "zinterest_rate": vals.get("interest_rate", 0.0),                
                 "os_amt": round(vals["os_amt"], 2),
                 "sanction_amt": round(vals["sanction_amt"], 2),
-                "os_percent": round((vals["os_amt"] / total_os) * 100, 2)
+                "interest_due": round(vals.get("interest_due", 0.0), 2),
+                "utilization_rate": vals.get("utilization_rate", 0.0),
+                "os_percent": round((vals["os_amt"] / total_os) * 100, 2),
+                "active_disb": vals.get("active_disb", 0),
             }
             for name, vals in borrowers_map.items()
         ],
@@ -764,6 +848,33 @@ def calculate_cof_dashboard(filters: dict, raw_data=None):
         key=lambda x: x["os_amt"],
         reverse=True
     )
+    # Txn Summary
+    txn_type_summary = sorted(
+    [
+        {
+            "txn_type": v["txn_type"],
+            "txn_type_desc": v["txn_type_desc"],
+            "sanction_amt": round(v["sanction_amt"], 2),
+            "os_amt": round(v["os_amt"], 2)
+        }
+        for v in txn_type_map.values()
+    ],
+    key=lambda x: x["os_amt"],
+    reverse=True
+)
+# Top 10 disbursements by OS amount
+    top_disb_os = sorted(
+        [
+            {
+                "disb_no": v["disb_no"],
+                "os_amt": round(v["os_amt"], 2),
+                "sanction_amt": round(v["sanction_amt"], 2)
+            }
+            for v in top_disb_map.values()
+        ],
+        key=lambda x: x["os_amt"],
+        reverse=True
+    )[:10]
     if products:
             # Find product with maximum zos_amt
             top_product_by_os = max(products, key=lambda p: p.get("zos_amt", 0))
@@ -833,6 +944,7 @@ def calculate_cof_dashboard(filters: dict, raw_data=None):
         "lv_top_prd":   lv_top_prd,
         "lv_hi_prd":    lv_hi_prd,
         "lv_lo_prd":    lv_lo_prd,
+        "lv_disb_cnt": len(disb_set),
         "lv_fixed_b":   round(lv_fixed_b, 2),
         "lv_float_b":   round(lv_float_b, 2),
         "lv_sec_b":     round(lv_sec_b,   2),
@@ -877,6 +989,9 @@ def calculate_cof_dashboard(filters: dict, raw_data=None):
             "sanctionVsOs": sanction_vs_os,
             "productBpExposure": product_bp_exposure,
             "bpSummary": bp_summary,
+            "txnTypeSummary": txn_type_summary,
+            "topDisbByOs": top_disb_os,
+            "currencySummary": currency_summary,
         },
 
         "row_count": len(rows),

@@ -263,8 +263,7 @@ export function OverviewPage({ isActive = false, totals = {}, products = [], bor
               color: '#6a9cbf'
             },
             title: {
-              display: true,
-              text: 'Rs Crores'
+              display: false,
             }
           }
         }
@@ -335,8 +334,7 @@ export function OverviewPage({ isActive = false, totals = {}, products = [], bor
             grid: { color: '#eaf3fb' },
             ticks: { color: '#6a9cbf' },
             title: {
-              display: true,
-              text: 'Rs Crores'
+              display: false,
             }
           }
         }

@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, use } from "react";
 
 function toNumber(value, fallback = 0) {
   const num = Number(value);
@@ -13,8 +13,14 @@ export function BorrowersPage({ isActive = false, totals = {}, borrowers = [], b
   const custChartInstanceRef = useRef(null);
   const loanOsChartRef = useRef(null);
   const loanOsChartInstanceRef = useRef(null);
+  const intRateChartRef = useRef(null);
+  const intRateChartInstanceRef = useRef(null);
   const intDueChartRef = useRef(null);
   const intDueChartInstanceRef = useRef(null);
+  const intUtilChartRef = useRef(null);
+  const intUtilChartInstanceRef = useRef(null);
+  const InitActiveDisbRef = useRef(null);
+  const initActiveDisbInstanceRef = useRef(null);
   const initCustomerChart = (borrowers_full) => {
     if (!custChartRef.current || !borrowers_full?.length) return;
 
@@ -123,8 +129,7 @@ export function BorrowersPage({ isActive = false, totals = {}, borrowers = [], b
               callback: (v) => `${v} Cr`
             },
             title: {
-              display: true,
-              text: "Rs Crores"
+              display: false,
             }
           }
         }
@@ -213,17 +218,18 @@ export function BorrowersPage({ isActive = false, totals = {}, borrowers = [], b
       }
     });
   };
-  const initInterestDueChart = (borrowers_full) => {
-    if (!intDueChartRef.current || !borrowers_full?.length) return;
 
-    if (intDueChartInstanceRef.current) {
-      intDueChartInstanceRef.current.destroy();
+  const initInterestRateChart = (borrowers_full) => {
+    if (!intRateChartRef.current || !borrowers_full?.length) return;
+
+    if (intRateChartInstanceRef.current) {
+      intRateChartInstanceRef.current.destroy();
     }
 
-    const ctx = intDueChartRef.current.getContext("2d");
+    const ctx = intRateChartRef.current.getContext("2d");
 
     const sorted = [...borrowers_full].sort(
-      (a, b) => toNumber(b.int_due_amt) - toNumber(a.int_due_amt)
+      (a, b) => toNumber(b.zinterest_rate) - toNumber(a.zinterest_rate)
     );
 
     const COLORS = [
@@ -232,7 +238,7 @@ export function BorrowersPage({ isActive = false, totals = {}, borrowers = [], b
       "#5c6bc0", "#26a69a"
     ];
 
-    intDueChartInstanceRef.current = new Chart(ctx, {
+    intRateChartInstanceRef.current = new Chart(ctx, {
       type: "bar",
       data: {
         labels: sorted.map(b =>
@@ -240,8 +246,7 @@ export function BorrowersPage({ isActive = false, totals = {}, borrowers = [], b
         ),
         datasets: [
           {
-            label: "Interest Due (Cr)",
-            data: sorted.map(b => toNumber(b.int_due_amt) / 1e7), // convert to Cr
+            data: sorted.map(b => toNumber(b.zinterest_rate)),
             backgroundColor: COLORS.map(c => c + "44"),
             borderColor: COLORS,
             borderWidth: 1.5,
@@ -254,7 +259,7 @@ export function BorrowersPage({ isActive = false, totals = {}, borrowers = [], b
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
-          legend: { display: true }
+          legend: { display: false }
         },
         scales: {
           x: {
@@ -270,13 +275,206 @@ export function BorrowersPage({ isActive = false, totals = {}, borrowers = [], b
             ticks: {
               color: "#6a9cbf",
               font: { size: 10 },
-              callback: (v) => `${v} Cr`
+              callback: (v) => `${v}%`
             }
           }
         }
       }
     });
   };
+  const initInterestDueChart = (borrowers_full) => {
+    if (!intDueChartRef.current || !borrowers_full?.length) return;
+
+    if (intDueChartInstanceRef.current) {
+      intDueChartInstanceRef.current.destroy();
+    }
+
+    const ctx = intDueChartRef.current.getContext("2d");
+
+    // 🔹 Sort by interest rate (DESC like your HTML logic)
+    const sorted = [...borrowers_full].sort(
+      (a, b) => toNumber(b.interest_due) - toNumber(a.interest_due)
+    );
+
+    const COLORS = [
+      "#42a5f5", "#66bb6a", "#ffa726", "#ab47bc",
+      "#ef5350", "#26c6da", "#d4e157", "#8d6e63",
+      "#5c6bc0", "#26a69a"
+    ];
+
+    intRateChartInstanceRef.current = new Chart(ctx, {
+      type: "bar",
+      data: {
+        labels: sorted.map(b =>
+          b.zborrower.split(" ").slice(0, 2).join(" ")
+        ),
+        datasets: [
+          {
+            data: sorted.map(b => toNumber(b.interest_due)),
+            backgroundColor: COLORS.map(c => c + "44"),
+            borderColor: COLORS,
+            borderWidth: 1.5,
+            borderRadius: 6,
+            maxBarThickness: 38
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false }
+        },
+        scales: {
+          x: {
+            grid: { display: false },
+            ticks: {
+              color: "#6a9cbf",
+              font: { size: 9 },
+              maxRotation: 30
+            }
+          },
+          y: {
+            grid: { color: "#eaf3fb" },
+            ticks: {
+              color: "#6a9cbf",
+              font: { size: 10 },
+              callback: (v) => `${v}%`
+            }
+          }
+        }
+      }
+    });
+  };
+  const initInterestutilChart = (borrowers_full) => {
+    if (!intUtilChartRef.current || !borrowers_full?.length) return;
+
+    if (intUtilChartInstanceRef.current) {
+      intUtilChartInstanceRef.current.destroy();
+    }
+
+    const ctx = intUtilChartRef.current.getContext("2d");
+
+    const sorted = [...borrowers_full].sort(
+      (a, b) => toNumber(b.utilization_rate) - toNumber(a.utilization_rate)
+    );
+
+    const COLORS = [
+      "#42a5f5", "#66bb6a", "#ffa726", "#ab47bc",
+      "#ef5350", "#26c6da", "#d4e157", "#8d6e63",
+      "#5c6bc0", "#26a69a"
+    ];
+
+    intRateChartInstanceRef.current = new Chart(ctx, {
+      type: "bar",
+      data: {
+        labels: sorted.map(b =>
+          b.zborrower.split(" ").slice(0, 2).join(" ")
+        ),
+        datasets: [
+          {
+            data: sorted.map(b => toNumber(b.utilization_rate)),
+            backgroundColor: COLORS.map(c => c + "44"),
+            borderColor: COLORS,
+            borderWidth: 1.5,
+            borderRadius: 6,
+            maxBarThickness: 38
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false }
+        },
+        scales: {
+          x: {
+            grid: { display: false },
+            ticks: {
+              color: "#6a9cbf",
+              font: { size: 9 },
+              maxRotation: 30
+            }
+          },
+          y: {
+            grid: { color: "#eaf3fb" },
+            ticks: {
+              color: "#6a9cbf",
+              font: { size: 10 },
+              callback: (v) => `${v}%`
+            }
+          }
+        }
+      }
+    });
+  };
+
+   const initActiveDisbChart = (borrowers_full) => {
+    if (!InitActiveDisbRef.current || !borrowers_full?.length) return;
+
+    if (initActiveDisbInstanceRef.current) {
+      initActiveDisbInstanceRef.current.destroy();
+    }
+
+    const ctx = InitActiveDisbRef.current.getContext("2d");
+
+
+    const sorted = [...borrowers_full].sort(
+      (a, b) => toNumber(b.active_disb) - toNumber(a.active_disb)
+    );
+
+    const COLORS = [
+      "#42a5f5", "#66bb6a", "#ffa726", "#ab47bc",
+      "#ef5350", "#26c6da", "#d4e157", "#8d6e63",
+      "#5c6bc0", "#26a69a"
+    ];
+
+    intRateChartInstanceRef.current = new Chart(ctx, {
+      type: "bar",
+      data: {
+        labels: sorted.map(b =>
+          b.zborrower.split(" ").slice(0, 2).join(" ")
+        ),
+        datasets: [
+          {
+            data: sorted.map(b => toNumber(b.active_disb)),
+            backgroundColor: COLORS.map(c => c + "44"),
+            borderColor: COLORS,
+            borderWidth: 1.5,
+            borderRadius: 6,
+            maxBarThickness: 38
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false }
+        },
+        scales: {
+          x: {
+            grid: { display: false },
+            ticks: {
+              color: "#6a9cbf",
+              font: { size: 9 },
+              maxRotation: 30
+            }
+          },
+          y: {
+            grid: { color: "#eaf3fb" },
+            ticks: {
+              color: "#6a9cbf",
+              font: { size: 10 },
+              callback: (v) => `${v}%`
+            }
+          }
+        }
+      }
+    });
+  };
+
   const switchBorrowerChart = (newMode) => {
     setMode(newMode);
 
@@ -300,9 +498,10 @@ export function BorrowersPage({ isActive = false, totals = {}, borrowers = [], b
     if (isActive && borrowers_full?.length) {
       initCustomerChart(borrowers_full);
       initLoanOsChart(borrowers_full);
+      initInterestRateChart(borrowers_full);
       initInterestDueChart(borrowers_full);
-
-
+      initInterestutilChart(borrowers_full);
+      initActiveDisbChart(borrowers_full);
     }
 
     return () => {
@@ -318,10 +517,23 @@ export function BorrowersPage({ isActive = false, totals = {}, borrowers = [], b
         loanOsChartInstanceRef.current.destroy();
         loanOsChartInstanceRef.current = null;
       }
+      if (intRateChartInstanceRef.current) {
+        intRateChartInstanceRef.current.destroy();
+        intRateChartInstanceRef.current = null;
+      }
       if (intDueChartInstanceRef.current) {
         intDueChartInstanceRef.current.destroy();
         intDueChartInstanceRef.current = null;
       }
+      if (intUtilChartInstanceRef.current) {
+        intUtilChartInstanceRef.current.destroy();
+        intUtilChartInstanceRef.current = null;
+      }
+      if(initActiveDisbInstanceRef.current) {
+        initActiveDisbInstanceRef.current.destroy();
+        initActiveDisbInstanceRef.current = null;
+      }
+
     };
   }, [bpSummary, isActive, borrowers_full]);
 
@@ -434,7 +646,7 @@ export function BorrowersPage({ isActive = false, totals = {}, borrowers = [], b
       <div class="two-col">
         <div class="chart-card">
           <div class="chart-header"><div><div class="chart-title">Customer Interest Rate Comparison</div><div class="chart-subtitle">RATE % BY CUSTOMER · COLOR = RISK BAND</div></div></div>
-          <div class="chart-wrap h280"><canvas id="borrCustRateBar"></canvas></div>
+          <div class="chart-wrap h280"><canvas ref={intRateChartRef}></canvas></div>
         </div>
         <div class="chart-card">
           <div class="chart-header"><div><div class="chart-title">Customer Loan Amount vs Outstanding</div><div class="chart-subtitle">GROUPED BAR · SANCTION VS O/S · Rs (Cr)</div></div></div>
@@ -448,11 +660,11 @@ export function BorrowersPage({ isActive = false, totals = {}, borrowers = [], b
       <div class="two-col">
         <div class="chart-card">
           <div class="chart-header"><div><div class="chart-title">Customer-Wise Interest Due (Rs Cr)</div><div class="chart-subtitle">INTEREST ACCRUED BY CUSTOMER</div></div></div>
-          <div class="chart-wrap h260"><canvas id="borrCustIntDueBar"></canvas></div>
+          <div class="chart-wrap h260"><canvas ref={intDueChartRef}></canvas></div>
         </div>
         <div class="chart-card">
           <div class="chart-header"><div><div class="chart-title">Facilities Count per Customer</div><div class="chart-subtitle">NUMBER OF ACTIVE DISBURSEMENTS</div></div></div>
-          <div class="chart-wrap h260"><canvas ref={intDueChartRef}></canvas></div>
+          <div class="chart-wrap h260"><canvas ref={InitActiveDisbRef}></canvas></div>
         </div>
       </div>
 
@@ -460,7 +672,7 @@ export function BorrowersPage({ isActive = false, totals = {}, borrowers = [], b
       <div class="two-col">
         <div class="chart-card">
           <div class="chart-header"><div><div class="chart-title">Customer Utilisation Rate (%)</div><div class="chart-subtitle">O/S ÷ SANCTIONED × 100 · BY CUSTOMER</div></div></div>
-          <div class="chart-wrap h260"><canvas id="borrCustUtilBar"></canvas></div>
+          <div class="chart-wrap h260"><canvas ref={intUtilChartRef}></canvas></div>
         </div>
         <div class="chart-card">
           <div class="chart-header"><div><div class="chart-title">Customer Risk vs Exposure Scatter</div><div class="chart-subtitle">RATE (Y) · O/S AMT (X) · BUBBLE = INT DUE</div></div></div>
@@ -473,14 +685,47 @@ export function BorrowersPage({ isActive = false, totals = {}, borrowers = [], b
         <div class="card-title">All Borrower Groups — Full Detail <span class="card-badge">5 GROUPS · 10 CUSTOMERS</span></div>
         <table class="data-table">
           <thead><tr><th>#</th><th>BP Group</th><th>O/S (Cr)</th><th>Sanction (Cr)</th><th>Int Due (Cr)</th><th>% Share</th><th>Facilities</th><th>Risk Level</th></tr></thead>
-          <tbody id="borrTable"></tbody>
-        </table>
+    <tbody>
+        {bpSummary.map((b, index) => (
+    <tr key={index}>
+      <td>{index + 1}</td>
+      <td>{b.bp_group}</td>
+      <td>{b.os_amt}</td>
+
+      <td>{(toNumber(b.sanction_amt) / 1e7).toFixed(2)}</td>
+      <td>{(toNumber(b.interest_due) / 1e7).toFixed(2)}</td>
+      <td>-</td>
+      <td>-</td>
+
+    </tr>
+  ))}
+    </tbody>
+     </table>
       </div>
       <div class="card">
         <div class="card-title">All Customers — Individual Detail <span class="card-badge">10 CUSTOMERS</span></div>
         <table class="data-table">
           <thead><tr><th>#</th><th>Customer</th><th>BP Group</th><th>O/S (Cr)</th><th>Sanction (Cr)</th><th>Int Due (Cr)</th><th>Rate %</th><th>Facilities</th><th>Utilisation</th></tr></thead>
-          <tbody id="borrCustTable"></tbody>
+         <tbody>
+  {borrowers_full.map((b, index) => (
+    <tr key={index}>
+      <td>{index + 1}</td>
+      <td>{b.zborrower}</td>
+      <td>{b.bp_group}</td>
+
+      <td>{(toNumber(b.os_amt) / 1e7).toFixed(2)}</td>
+      <td>{(toNumber(b.sanction_amt) / 1e7).toFixed(2)}</td>
+      <td>{(toNumber(b.interest_due) / 1e7).toFixed(2)}</td>
+
+      <td>{toNumber(b.zinterest_rate).toFixed(2)}%</td>
+
+      {/* Facilities not in your data → show "-" */}
+      <td>-</td>
+
+      <td>{toNumber(b.utilization_rate).toFixed(2)}%</td>
+    </tr>
+  ))}
+</tbody>
         </table>
       </div>
 

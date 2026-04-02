@@ -6,15 +6,15 @@ import {
   FtrEditModal,
   LoadingScreen,
 } from "./components/layout/DashboardShell";
-import { AnalyticsPage }    from "./components/pages/AnalyticsPage";
-import { MaturityPage }     from "./components/pages/MaturityPage";
-import { LendersPage }      from "./components/pages/LendersPage";
-import { OverviewPage }     from "./components/pages/OverviewPage";
-import { PortfolioPage }    from "./components/pages/PortfolioPage";
-import {BorrowersPage}      from "./components/pages/BorrowersPage";
+import { AnalyticsPage } from "./components/pages/AnalyticsPage";
+import { MaturityPage } from "./components/pages/MaturityPage";
+import { LendersPage } from "./components/pages/LendersPage";
+import { OverviewPage } from "./components/pages/OverviewPage";
+import { PortfolioPage } from "./components/pages/PortfolioPage";
+import { BorrowersPage } from "./components/pages/BorrowersPage";
 import { TransactionsPage } from "./components/pages/TransactionsPage";
-import { useAuth }          from "./hooks/useAuth";
-import { queryData }        from "./lib/api";
+import { useAuth } from "./hooks/useAuth";
+import { queryData } from "./lib/api";
 import { activateDashboardPage, bootCofDashboard } from "./lib/cofDashboardEngine";
 
 function SessionError({ message }) {
@@ -32,10 +32,11 @@ function SessionError({ message }) {
 function App() {
   const auth = useAuth();
   const [activePage, setActivePage] = useState("overview");
-  const [isLoading,  setIsLoading]  = useState(true);
-  const [loadError,  setLoadError]  = useState("");
-  const [reportState, setReportState] = useState({ totals: {}, lenders: [], products: [], borrowers: [], portfolios: [], assets: [], sanctionVsOs: [], productBpExposure: [],   bpSummary: [], borrowers_full: [] 
- });
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+  const [reportState, setReportState] = useState({
+    totals: {}, lenders: [], products: [], borrowers: [], portfolios: [], assets: [], sanctionVsOs: [], productBpExposure: [], bpSummary: [], borrowers_full: [], txnTypeSummary: [], topDisbByOs: [], currencySummary: []
+  });
 
   useEffect(() => {
     if (auth.status !== "valid") return undefined;
@@ -47,55 +48,58 @@ function App() {
         // queryData(apiBase, token, queryType, filters)
         // session_id is picked up automatically from the URL by api.js
         const dashboard = await queryData(
-  auth.env.apiBase,
-  auth.env.token,
-  "cof_dashboard",
-  {}, // filters
-  [
-    {
-      zprd_type: "LOAN",
-      zprd_desc: "Test Loan",
-      zcounterpty: "HDFC",
-      zrate_type: "Fixed",
-      zportfo_desc: "Secured",
-      zclosing_amt: 1000000,
-      zaccrual_amt: 5000,
-      zwt_avg_amt: 1000000,
-      zavg_funds: 1000000,
-      zwt_int_amt: 3000,
-      zavg_rate_eir: 5.5,
-      zend_date: "20271231"
-    },
-        {
-      zprd_type: "EMI",
-      zprd_desc: "Test Loan 2",
-      zcounterpty: "ICICI",
-      zrate_type: "Fixed",
-      zportfo_desc: "Secured",
-      zclosing_amt: 1000000,
-      zaccrual_amt: 5000,
-      zwt_avg_amt: 1000000,
-      zavg_funds: 1000000,
-      zwt_int_amt: 3000,
-      zavg_rate_eir: 5.5,
-      zend_date: "20271231"
-    }
-  ]
-);
+          auth.env.apiBase,
+          auth.env.token,
+          "cof_dashboard",
+          {}, // filters
+          [
+            {
+              zprd_type: "LOAN",
+              zprd_desc: "Test Loan",
+              zcounterpty: "HDFC",
+              zrate_type: "Fixed",
+              zportfo_desc: "Secured",
+              zclosing_amt: 1000000,
+              zaccrual_amt: 5000,
+              zwt_avg_amt: 1000000,
+              zavg_funds: 1000000,
+              zwt_int_amt: 3000,
+              zavg_rate_eir: 5.5,
+              zend_date: "20271231"
+            },
+            {
+              zprd_type: "EMI",
+              zprd_desc: "Test Loan 2",
+              zcounterpty: "ICICI",
+              zrate_type: "Fixed",
+              zportfo_desc: "Secured",
+              zclosing_amt: 1000000,
+              zaccrual_amt: 5000,
+              zwt_avg_amt: 1000000,
+              zavg_funds: 1000000,
+              zwt_int_amt: 3000,
+              zavg_rate_eir: 5.5,
+              zend_date: "20271231"
+            }
+          ]
+        );
 
         if (!cancelled) {
           const rs = dashboard?.render_state || {};
           setReportState({
-            totals:       rs.totals       || {},
-            lenders:      Array.isArray(rs.lenders)      ? rs.lenders      : [],
+            totals: rs.totals || {},
+            lenders: Array.isArray(rs.lenders) ? rs.lenders : [],
             products: Array.isArray(rs.products) ? rs.products : [],
             borrowers: Array.isArray(rs.borrowers) ? rs.borrowers : [],
             portfolios: Array.isArray(rs.portfolios) ? rs.portfolios : [],
             assets: Array.isArray(rs.asset_classification) ? rs.asset_classification : [],
             sanctionVsOs: Array.isArray(rs.sanctionVsOs) ? rs.sanctionVsOs : [],
-            productBpExposure : Array.isArray(rs.productBpExposure ) ? rs.productBpExposure : [],
+            productBpExposure: Array.isArray(rs.productBpExposure) ? rs.productBpExposure : [],
             bpSummary: Array.isArray(rs.bpSummary) ? rs.bpSummary : [],
             borrowers_full: Array.isArray(rs.borrowers_full) ? rs.borrowers_full : [],
+            txnTypeSummary: Array.isArray(rs.txnTypeSummary) ? rs.txnTypeSummary : [],
+            topDisbByOs: Array.isArray(rs.topDisbByOs) ? rs.topDisbByOs : [],
+            currencySummary: Array.isArray(rs.currencySummary) ? rs.currencySummary : [],
           });
           bootCofDashboard(dashboard);
         }
@@ -117,7 +121,7 @@ function App() {
   }, [activePage]);
 
   if (auth.status === "error") return <SessionError message={auth.error} />;
-  if (loadError)               return <SessionError message={loadError} />;
+  if (loadError) return <SessionError message={loadError} />;
 
   return (
     <>
@@ -135,7 +139,7 @@ function App() {
           portfolios={reportState.portfolios}
           assets={reportState.assets}
           sanctionVsOs={reportState.sanctionVsOs}
-          productBpExposure ={reportState.productBpExposure}
+          productBpExposure={reportState.productBpExposure}
         />
         <AnalyticsPage isActive={activePage === "analytics"} />
         <PortfolioPage
@@ -143,17 +147,23 @@ function App() {
           totals={reportState.totals}
           products={reportState.products}
         />
-        <BorrowersPage 
-        isActive = {activePage === "borrower"}
-        totals={reportState.totals}
-        bpSummary={reportState.bpSummary}
-        borrowers_full={reportState.borrowers_full}
+        <BorrowersPage
+          isActive={activePage === "borrower"}
+          totals={reportState.totals}
+          bpSummary={reportState.bpSummary}
+          borrowers_full={reportState.borrowers_full}
         />
         <MaturityPage isActive={activePage === "maturity"} />
         <TransactionsPage
           isActive={activePage === "transactions"}
           totals={reportState.totals}
           transactions={reportState.transactions}
+          txnTypeSummary={reportState.txnTypeSummary}
+          assetData={reportState.assets}
+          topDisbByOs={reportState.topDisbByOs}
+          bpSummary={reportState.bpSummary}
+          currencySummary={reportState.currencySummary}
+
         />
         <LendersPage
           isActive={activePage === "lenders"}

@@ -32,6 +32,8 @@ export function PortfolioPage({ isActive = false, totals = {}, products = [] }) 
   const assetStackInstanceRef = useRef(null);
   const exposureChartRef = useRef(null);
   const exposureChartInstanceRef = useRef(null);
+  const yieldRatioChartRef = useRef(null);
+  const yieldRatioChartInstanceRef = useRef(null);
   const initProductGroupedChart = (ProductList) => {
     if (!prdGroupRef.current || !ProductList?.length) return;
 
@@ -183,14 +185,12 @@ export function PortfolioPage({ isActive = false, totals = {}, products = [] }) 
 
     const ctx = assetStackRef.current.getContext('2d');
 
-    // 1️⃣ Get all asset groups dynamically
     const assetGroups = [
       ...new Set(
         products.flatMap(p => p.assets_groups.map(a => a.asset_group))
       )
     ];
 
-    // 2️⃣ Colors (same style as your HTML)
     const COLORS = {
       "Standard": "#1565c0",
       "Watch": "#42a5f5",
@@ -325,7 +325,72 @@ export function PortfolioPage({ isActive = false, totals = {}, products = [] }) 
       }
     });
   };
+  const inityeildRatioChart = (ProductList) => {
+    if (!yieldRatioChartRef.current || !ProductList?.length) return;
 
+    if (yieldRatioChartInstanceRef.current) {
+      yieldRatioChartInstanceRef.current.destroy();
+    }
+
+    const ctx = yieldRatioChartRef.current.getContext('2d');
+
+    const makeGradient = (color) => {
+      const grad = ctx.createLinearGradient(0, 0, 0, 300);
+      grad.addColorStop(0, color);
+      grad.addColorStop(1, '#ffffff');
+      return grad;
+    };
+
+    yieldRatioChartInstanceRef.current = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: ProductList.map(p => `${p.zprd_type} - ${p.zprd_desc || 'Unknown'}`), datasets: [
+          {
+            label: 'Yield Ratio (%)',
+            data: ProductList.map(p => toNumber(p.zinterest_ratio)),
+            backgroundColor: makeGradient('#90caf9'),
+            borderRadius: 6,
+            maxBarThickness: 40
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => `${ctx.raw.toFixed(2)} Cr`
+            }
+          }
+        },
+        scales: {
+          x: {
+            grid: { display: false },
+            ticks: {
+              color: '#6a9cbf',
+              font: { size: 9 },
+              maxRotation: 0,
+              minRotation: 0,
+              autoSkip: false
+            }
+          },
+          y: {
+            beginAtZero: true,
+            grid: { color: '#eaf3fb' },
+            ticks: {
+              color: '#6a9cbf',
+              callback: (val) => `${val} Cr`
+            },
+            title: {
+              display: false,
+            }
+          }
+        }
+      }
+    });
+  };
 
   useEffect(() => {
     if (products?.length > 0) {
@@ -333,6 +398,7 @@ export function PortfolioPage({ isActive = false, totals = {}, products = [] }) 
       initRateChart(products);
       initProductAssetStackedChart(products);
       initExposureChart(products);
+      inityeildRatioChart(products);
 
     }
 
@@ -352,6 +418,10 @@ export function PortfolioPage({ isActive = false, totals = {}, products = [] }) 
       if (exposureChartInstanceRef.current) {
         exposureChartInstanceRef.current.destroy();
         exposureChartInstanceRef.current = null;
+      }
+      if (yieldRatioChartInstanceRef.current) {
+        yieldRatioChartInstanceRef.current.destroy();
+        yieldRatioChartInstanceRef.current = null;  
       }
     };
 
@@ -445,7 +515,7 @@ export function PortfolioPage({ isActive = false, totals = {}, products = [] }) 
         </div>
         <div class="chart-card">
           <div class="chart-header"><div><div class="chart-title">Total Interest Due vs O/S Ratio</div><div class="chart-subtitle">INT DUE AS % OF O/S · YIELD INDICATOR</div></div></div>
-          <div class="chart-wrap h260"><canvas id="portIntYieldBar"></canvas></div>
+          <div class="chart-wrap h260"><canvas ref={yieldRatioChartRef}></canvas></div>
         </div>
       </div>
 

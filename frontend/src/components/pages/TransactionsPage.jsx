@@ -1,18 +1,351 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 
 function toNumber(value, fallback = 0) {
   const num = Number(value);
   return Number.isFinite(num) ? num : fallback;
 }
+function formatCrores(value) {
+  const crores = toNumber(value) / 1e7;
+  return `${crores.toLocaleString('en-IN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })} Cr`;
+}
+export function TransactionsPage({ isActive = false, totals = {}, transactions = [], txnTypeSummary = [], assetData = [], topDisbByOs = [], bpSummary = [], currencySummary = [] }) {
+    const intOutstandingChartRef = useRef(null);
+    const intOutstandingChartInstanceRef = useRef(null);
+    const top10ChartRef = useRef(null);
+const top10ChartInstanceRef = useRef(null);
+      const donutRef = useRef(null);
+  const donutInstanceRef = useRef(null);
+  const grpStackedRef = useRef(null);
+const grpStackedInstanceRef = useRef(null);
+  const initoutstandingByTypeChart = (txnSummaryList) => {
+    if (!intOutstandingChartRef.current || !txnSummaryList?.length) return;
 
-export function TransactionsPage({ isActive = false, totals = {}, transactions = [] }) {
+    if (intOutstandingChartInstanceRef.current) {
+      intOutstandingChartInstanceRef.current.destroy();
+    }
+
+    const ctx = intOutstandingChartRef.current.getContext('2d');
+
+    const makeGradient = (color) => {
+      const grad = ctx.createLinearGradient(0, 0, 0, 300);
+      grad.addColorStop(0, color);
+      grad.addColorStop(1, '#ffffff');
+      return grad;
+    };
+
+    intOutstandingChartInstanceRef.current = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: txnSummaryList.map(p =>
+          `${p.txn_type} - ${p.txn_type_desc || 'Unknown'}`
+        ),
+        datasets: [
+          {
+            label: 'Sanctioned (Cr)',
+            data: txnSummaryList.map(p => toNumber(p.sanction_amt) / 1e7),
+            backgroundColor: makeGradient('#26c6da'),
+            borderRadius: 6,
+            maxBarThickness: 30
+          },
+          {
+            label: 'O/S Amount (Cr)',
+            data: txnSummaryList.map(p => toNumber(p.os_amt) / 1e7),
+            backgroundColor: makeGradient('#1565c0'),
+            borderRadius: 6,
+            maxBarThickness: 30
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: 'top'
+          }
+        },
+        scales: {
+          x: {
+            grid: { display: false },
+            ticks: {
+              color: '#6a9cbf',
+              maxRotation: 0,
+              minRotation: 0,
+              autoSkip: false,
+              font: {
+                size: 9
+              }
+            }
+          },
+          y: {
+            beginAtZero: true,
+            grid: { color: '#eaf3fb' },
+            title: {
+              display: true,
+              text: 'Rs Crores'
+            }
+          }
+        }
+      }
+    });
+  };
+    const initDonutChart = (assetData) => {
+    if (!donutRef.current || !assetData?.length) return;
+
+    // destroy old chart
+    if (donutInstanceRef.current) {
+      donutInstanceRef.current.destroy();
+    }
+
+    const ctx = donutRef.current.getContext('2d');
+
+    donutInstanceRef.current = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: assetData.map(a => a.asset_class),
+        datasets: [{
+          data: assetData.map(a => toNumber(a.os_amt) / 1e7), // convert to Cr
+          backgroundColor: ['#1565c0', '#0288d1', '#00acc1'],
+          borderWidth: 0,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: 'bottom'
+          },
+          tooltip: {
+            callbacks: {
+              label: function (context) {
+                return `₹${context.raw.toFixed(2)} Cr`;
+              }
+            }
+          }
+        },
+        cutout: '65%'
+      }
+    });
+  };
+const initTop10Chart = (data) => {
+  if (!top10ChartRef.current || !data?.length) return;
+
+  if (top10ChartInstanceRef.current) {
+    top10ChartInstanceRef.current.destroy();
+  }
+
+  const ctx = top10ChartRef.current.getContext("2d");
+
+  top10ChartInstanceRef.current = new Chart(ctx, {
+    type: "bar",
+    data: {
+      labels: data.map((d, i) => {
+        const disNo = d?.disb_no;
+        return disNo
+          ? disNo.replace("DIS000000000", "#")
+          : `#${i + 1}`;
+      }),
+      datasets: [
+        {
+          label: "O/S Amount (Cr)",
+          data: data.map(d => toNumber(d?.os_amt) / 1e7),
+          backgroundColor: data.map(() => "#1565c044"),
+          borderColor: data.map(() => "#1565c0"),
+          borderWidth: 1.5,
+          borderRadius: 6,
+          maxBarThickness: 18,
+        }
+      ]
+    },
+    options: {
+      indexAxis: "y",
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false }
+      },
+      scales: {
+        x: {
+          grid: { color: "#eaf3fb" },
+          ticks: {
+            color: "#6a9cbf",
+            callback: val => `${val} Cr`
+          }
+        },
+        y: {
+          grid: { display: false },
+          ticks: { color: "#6a9cbf" }
+        }
+      }
+    }
+  });
+};
+const initCurrencyDonut = (currencySummary) => {
+  if (!currencySummary?.length) return;
+
+  const canvas = document.getElementById("txnCurrOsDonut");
+  if (!canvas) return;
+
+  const ctx = canvas.getContext("2d");
+
+  // destroy previous
+  if (window.currencyChartInstance) {
+    window.currencyChartInstance.destroy();
+  }
+
+  window.currencyChartInstance = new Chart(ctx, {
+    type: "doughnut",
+    data: {
+      labels: currencySummary.map(c => c.currency),
+      datasets: [
+        {
+          data: currencySummary.map(c => toNumber(c.os_amt) / 1e7), // convert to Cr
+          backgroundColor: ["#1565c0", "#00acc1"],
+          borderWidth: 0,
+          hoverOffset: 6
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout: "70%",
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => `₹${ctx.raw.toFixed(2)} Cr`
+          }
+        }
+      }
+    }
+  });
+};
+const initGrpProductStackedChart = (bpSummary) => {
+  if (!grpStackedRef.current || !bpSummary?.length) return;
+
+  if (grpStackedInstanceRef.current) {
+    grpStackedInstanceRef.current.destroy();
+  }
+
+  const ctx = grpStackedRef.current.getContext("2d");
+
+  // 👉 Extract group names
+  const grpNames = bpSummary.map(g => g.bp_group);
+
+  // 👉 Extract unique product types (dynamic)
+  const prdTypes = [
+    ...new Set(
+      bpSummary.flatMap(g => g.products.map(p => p.prd_type))
+    )
+  ];
+
+  // 👉 Colors (reuse yours if needed)
+  const COLORS = ["#1565c0", "#26c6da", "#42a5f5", "#00acc1", "#90caf9"];
+
+  // 👉 Build datasets
+  const datasets = prdTypes.map((pt, i) => ({
+    label: pt,
+    data: bpSummary.map(group => {
+      const prod = group.products.find(p => p.prd_type === pt);
+      return toNumber(prod?.os_amt) / 1e7; // convert to Cr
+    }),
+    backgroundColor: COLORS[i % COLORS.length] + "aa",
+    borderColor: COLORS[i % COLORS.length],
+    borderWidth: 1,
+    borderRadius: 4,
+    borderSkipped: false,
+  }));
+
+  grpStackedInstanceRef.current = new Chart(ctx, {
+    type: "bar",
+    data: {
+      labels: grpNames,
+      datasets: datasets
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: "top",
+          labels: {
+            color: "#2e6090",
+            font: { size: 10 }
+          }
+        }
+      },
+      scales: {
+        x: {
+          stacked: true,
+          grid: { display: false },
+          ticks: { color: "#6a9cbf", font: { size: 10 } }
+        },
+        y: {
+          stacked: true,
+          grid: { color: "#eaf3fb" },
+          ticks: {
+            color: "#6a9cbf",
+            callback: val => `${val} Cr`
+          }
+        }
+      }
+    }
+  });
+};
 useEffect(() => {
-  if (isActive && transactions.length > 0) {
+  if (!isActive) return;
+
+  if (transactions.length > 0) {
     setTimeout(() => {
       window.activateDashboardPage?.("transactions");
     }, 100);
   }
-}, [isActive, transactions]);
+
+  if (txnTypeSummary?.length > 0) {
+    initoutstandingByTypeChart(txnTypeSummary);
+  }
+
+  if (assetData?.length > 0) {
+    initDonutChart(assetData);
+  }
+
+  if (topDisbByOs?.length > 0) {
+    initTop10Chart(topDisbByOs);
+  }
+  if (bpSummary?.length > 0) {
+  initGrpProductStackedChart(bpSummary);
+}
+if (currencySummary?.length > 0) {
+  initCurrencyDonut(currencySummary);
+}
+
+  return () => {
+    if (intOutstandingChartInstanceRef.current) {
+      intOutstandingChartInstanceRef.current.destroy();
+      intOutstandingChartInstanceRef.current = null;
+    }
+
+    if (donutInstanceRef.current) {
+      donutInstanceRef.current.destroy();
+      donutInstanceRef.current = null;
+    }
+
+    if (top10ChartInstanceRef.current) {
+      top10ChartInstanceRef.current.destroy();
+      top10ChartInstanceRef.current = null;
+    }
+    if (grpStackedInstanceRef.current) {
+  grpStackedInstanceRef.current.destroy();
+  grpStackedInstanceRef.current = null;
+}
+  };
+
+}, [isActive, transactions, txnTypeSummary, assetData, topDisbByOs,currencySummary]);
   const transactionCount = Array.isArray(transactions) ? transactions.length : 0;
   const uniqueCounterparties = Array.isArray(transactions)
     ? new Set(transactions.map((row) => row?.[5]).filter(Boolean)).size
@@ -38,7 +371,7 @@ useEffect(() => {
             <span class="kpi-badge up">All</span>
           </div>
           <div class="kpi-label">Total Disbursements</div>
-          <div class="kpi-value">25</div>
+          <div class="kpi-value">{totals.lv_disb_cnt || 0}</div>
           <div class="kpi-sub">Active loan disbursements across all products</div>
           <div class="kpi-spark"><div class="kpi-spark-fill" data-w="100"></div></div>
           <div class="kpi-divider"></div>
@@ -53,7 +386,7 @@ useEffect(() => {
             <span class="kpi-badge up">Prod</span>
           </div>
           <div class="kpi-label">Product Categories</div>
-          <div class="kpi-value">5</div>
+          <div class="kpi-value">{totals.lv_prd_cnt || 0}</div>
           <div class="kpi-sub">10A · 22B · 33C · 44D · 55E</div>
           <div class="kpi-spark"><div class="kpi-spark-fill" data-w="75"></div></div>
           <div class="kpi-divider"></div>
@@ -92,29 +425,85 @@ useEffect(() => {
       </div>
     </div>
 
+      <div class="section-label">O/S &amp; Exposure — Visual Breakdown</div>
+      <div class="two-col">
+        <div class="chart-card">
+          <div class="chart-header">
+            <div>
+              <div class="chart-title">O/S Exposure by Borrower Group</div>
+              <div class="chart-subtitle">STACKED BAR — PRODUCT MIX WITHIN EACH GROUP</div>
+            </div>
+          </div>
+          <div class="chart-wrap h260"><canvas ref={grpStackedRef}></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-header">
+            <div>
+              <div class="chart-title">Loan Amt vs O/S by Transaction Type</div>
+              <div class="chart-subtitle">GROUPED BAR · SANCTION VS OUTSTANDING PER TXN TYPE</div>
+            </div>
+          </div>
+          <div class="chart-wrap h260"><canvas ref={intOutstandingChartRef}></canvas></div>
+        </div>
+      </div>
     <div class="section-label">Disbursement-Level O/S &amp; Exposure Profile</div>
   <div class="three-col">
           <div class="chart-card">
         <div class="chart-header"><div><div class="chart-title">O/S by Currency</div><div class="chart-subtitle">INR VS USD OUTSTANDING EXPOSURE</div></div></div>
         <div class="chart-wrap h200"><canvas id="txnCurrOsDonut"></canvas></div>
-        <div class="donut-legend" style={{marginTop:"10px"}}>
-          <div class="legend-row"><div class="legend-dot" style={{background:"#1565c0"}}></div><div class="legend-label">INR O/S</div><div class="legend-val">₹79.65 Cr</div><div class="legend-pct">84.2%</div></div>
-          <div class="legend-row"><div class="legend-dot" style={{background:"#00acc1"}}></div><div class="legend-label">USD O/S</div><div class="legend-val">₹14.90 Cr</div><div class="legend-pct">15.8%</div></div>
-        </div>
+<div className="donut-legend" style={{ marginTop: "10px" }}>
+  {currencySummary.map((c, i) => (
+    <div className="legend-row" key={i}>
+      <div
+        className="legend-dot"
+        style={{
+          background: i === 0 ? "#1565c0" : "#00acc1"
+        }}
+      ></div>
+
+      <div className="legend-label">{c.currency} O/S</div>
+
+      <div className="legend-val">
+        ₹{formatCrores(c.os_amt)}
+      </div>
+
+      <div className="legend-pct">
+        {c.os_percent?.toFixed(1)}%
+      </div>
+    </div>
+  ))}
+</div>
       </div>
 
        <div class="chart-card">
         <div class="chart-header"><div><div class="chart-title">Top 10 Disbursements by O/S</div><div class="chart-subtitle">INDIVIDUAL DIS NO — O/S AMOUNT · Rs (Cr)</div></div></div>
-        <div class="chart-wrap h260"><canvas id="txnTop10OsBar"></canvas></div>
+        <div class="chart-wrap h260"><canvas ref={top10ChartRef}></canvas></div>
       </div>
       <div class="chart-card">
         <div class="chart-header"><div><div class="chart-title">O/S Distribution by Asset Class</div><div class="chart-subtitle">STANDARD · WATCH · SPECIAL MENTION O/S</div></div></div>
-        <div class="chart-wrap h200"><canvas id="txnAssetOsDonut"></canvas></div>
-        <div class="donut-legend" style={{marginTop:"10px"}}>
-          <div class="legend-row"><div class="legend-dot" style={{background:"#1565c0"}}></div><div class="legend-label">Standard</div><div class="legend-val">₹63.30 Cr</div><div class="legend-pct">66.9%</div></div>
-          <div class="legend-row"><div class="legend-dot" style={{background:"#42a5f5"}}></div><div class="legend-label">Watch</div><div class="legend-val">₹17.45 Cr</div><div class="legend-pct">18.5%</div></div>
-          <div class="legend-row"><div class="legend-dot" style={{background:"#00acc1"}}></div><div class="legend-label">Special Mention</div><div class="legend-val">₹13.80 Cr</div><div class="legend-pct">14.6%</div></div>
-        </div>
+        <div class="chart-wrap h200"><canvas ref={donutRef}></canvas></div>
+          <div class="donut-legend" style={{ marginTop: "8px" }}>
+            <div className="legend-row">
+              <div className="legend-dot" style={{ background: "#1565c0" }}></div>
+              <div className="legend-label">{assetData[0]?.asset_class}</div>
+              <div className="legend-val">₹{formatCrores(assetData[0]?.os_amt)}</div>
+              <div className="legend-pct">{assetData[0]?.os_percent}%</div>
+            </div>
+
+            <div className="legend-row">
+              <div className="legend-dot" style={{ background: "#42a5f5" }}></div>
+              <div className="legend-label">{assetData[1]?.asset_class}</div>
+              <div className="legend-val">₹{formatCrores(assetData[1]?.os_amt)}</div>
+              <div className="legend-pct">{assetData[1]?.os_percent}%</div>
+            </div>
+
+            <div className="legend-row">
+              <div className="legend-dot" style={{ background: "#00acc1" }}></div>
+              <div className="legend-label">{assetData[2]?.asset_class}</div>
+              <div className="legend-val">₹{formatCrores(assetData[2]?.os_amt)}</div>
+              <div className="legend-pct">{assetData[2]?.os_percent}%</div>
+            </div>
+          </div>
       </div>
   </div>
      
