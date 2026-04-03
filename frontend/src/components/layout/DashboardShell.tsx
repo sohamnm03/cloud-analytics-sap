@@ -183,7 +183,7 @@ export function DashboardHeader({ activePage, onPageChange }: DashboardHeaderPro
         </div>
         <div>
           <div className="logo">NEXUS CREDIT </div>
-          <div className="logo-sub"> Loan Portfolio Analytics — Global Credit Co · SAP S/4HANA
+          <div className="logo-sub"> Loan Portfolio Analytics — Global Credit Co <br /> SAP S/4HANA
             <span
               style={{
                 background: "var(--blue-dark)",

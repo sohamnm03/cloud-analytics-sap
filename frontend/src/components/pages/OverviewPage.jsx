@@ -16,15 +16,6 @@ function formatCrores(value) {
 
 export function OverviewPage({ isActive = false, totals = {}, products = [], borrowers = [], portfolios = [], assets = [], sanctionVsOs = [], productBpExposure = [] }) {
   const [chartMode, setChartMode] = useState('total_loan');
-  const totalBook = toNumber(totals.lv_total_b);
-  const avgEir = toNumber(totals.lv_avg_eir);
-  const totalAccrual = toNumber(totals.lv_total_acc);
-  const productCount = toNumber(totals.lv_prd_cnt);
-  const lenderCount = toNumber(totals.lv_lend_cnt);
-  const topProduct = String(totals.lv_top_prd || '—');
-  const topProductBook = toNumber(totals.lv_top_cl);
-  const highEirProduct = String(totals.lv_hi_prd || '');
-  const highEirValue = toNumber(totals.lv_hi_eir_val);
   const chartRef = useRef(null);
   const chartInstanceRef = useRef(null);
   const donutRef = useRef(null);
@@ -412,7 +403,6 @@ export function OverviewPage({ isActive = false, totals = {}, products = [], bor
             ticks: { color: '#6a9cbf' },
             title: {
               display: true,
-              text: 'Rs Crores'
             }
           }
         }

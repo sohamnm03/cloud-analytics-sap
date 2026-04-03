@@ -4,7 +4,13 @@ function toNumber(value, fallback = 0) {
   const num = Number(value);
   return Number.isFinite(num) ? num : fallback;
 }
-
+function formatCrores(value) {
+  const crores = toNumber(value) / 1e7;
+  return `${crores.toLocaleString('en-IN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })} Cr`;
+}
 export function BorrowersPage({ isActive = false, totals = {}, borrowers = [], bpSummary = [], borrowers_full = [] }) {
   const [mode, setMode] = useState("os");
   const borrChartRef = useRef(null);
@@ -21,6 +27,10 @@ export function BorrowersPage({ isActive = false, totals = {}, borrowers = [], b
   const intUtilChartInstanceRef = useRef(null);
   const InitActiveDisbRef = useRef(null);
   const initActiveDisbInstanceRef = useRef(null);
+  const donutConcentRef = useRef(null);
+  const donutConcentInstanceRef = useRef(null);
+  const borrCustBubbleRef = useRef(null);
+  const borrCustBubbleInstanceRef = useRef(null);
   const initCustomerChart = (borrowers_full) => {
     if (!custChartRef.current || !borrowers_full?.length) return;
 
@@ -115,7 +125,7 @@ export function BorrowersPage({ isActive = false, totals = {}, borrowers = [], b
             grid: { display: false },
             ticks: {
               color: "#6a9cbf",
-              maxRotation: 0,   // ✅ straight labels
+              maxRotation: 0,
               minRotation: 0,
               autoSkip: false,
               font: { size: 10 }
@@ -302,7 +312,7 @@ export function BorrowersPage({ isActive = false, totals = {}, borrowers = [], b
       "#5c6bc0", "#26a69a"
     ];
 
-    intRateChartInstanceRef.current = new Chart(ctx, {
+    intDueChartInstanceRef.current = new Chart(ctx, {
       type: "bar",
       data: {
         labels: sorted.map(b =>
@@ -365,7 +375,7 @@ export function BorrowersPage({ isActive = false, totals = {}, borrowers = [], b
       "#5c6bc0", "#26a69a"
     ];
 
-    intRateChartInstanceRef.current = new Chart(ctx, {
+    intUtilChartInstanceRef.current = new Chart(ctx, {
       type: "bar",
       data: {
         labels: sorted.map(b =>
@@ -410,7 +420,7 @@ export function BorrowersPage({ isActive = false, totals = {}, borrowers = [], b
     });
   };
 
-   const initActiveDisbChart = (borrowers_full) => {
+  const initActiveDisbChart = (borrowers_full) => {
     if (!InitActiveDisbRef.current || !borrowers_full?.length) return;
 
     if (initActiveDisbInstanceRef.current) {
@@ -430,7 +440,7 @@ export function BorrowersPage({ isActive = false, totals = {}, borrowers = [], b
       "#5c6bc0", "#26a69a"
     ];
 
-    intRateChartInstanceRef.current = new Chart(ctx, {
+    initActiveDisbInstanceRef.current = new Chart(ctx, {
       type: "bar",
       data: {
         labels: sorted.map(b =>
@@ -491,9 +501,172 @@ export function BorrowersPage({ isActive = false, totals = {}, borrowers = [], b
     chart.update();
   };
 
+  const initCustomerBubbleChart = (borrowers) => {
+    if (!borrCustBubbleRef.current || !borrowers?.length) return;
+
+    if (borrCustBubbleInstanceRef.current) {
+      borrCustBubbleInstanceRef.current.destroy();
+    }
+
+    const ctx = borrCustBubbleRef.current.getContext("2d");
+
+    const COLORS = [
+      '#1565c0', '#0288d1', '#00acc1', '#1e88e5', '#1976d2',
+      '#006064', '#01579b', '#0277bd', '#283593', '#1a237e'
+    ];
+
+    borrCustBubbleInstanceRef.current = new Chart(ctx, {
+      type: "bubble",
+      data: {
+        datasets: borrowers.map((c, i) => ({
+          label: c.zborrower.split(" ").slice(0, 2).join(" "), // short name
+          data: [{
+            x: toNumber(c.os_amt) / 1e7,              // 👉 Cr
+            y: toNumber(c.zinterest_rate),            // 👉 %
+            r: Math.max(6, (toNumber(c.interest_due) / 1e7) * 10) // 👉 scaled
+          }],
+          backgroundColor: COLORS[i % COLORS.length] + "66",
+          borderColor: COLORS[i % COLORS.length],
+          borderWidth: 2
+        }))
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: { duration: 600 },
+        plugins: {
+          legend: {
+            display: true,
+            position: "right",
+            labels: {
+              font: { size: 8 },
+              color: "#2e6090",
+              padding: 6,
+              boxWidth: 8
+            }
+          },
+          tooltip: {
+            callbacks: {
+              label: function (ctx) {
+                const d = borrowers[ctx.datasetIndex];
+                return [
+                  `${d.zborrower}`,
+                  `O/S: ₹${(d.os_amt / 1e7).toFixed(2)} Cr`,
+                  `Rate: ${d.zinterest_rate}%`,
+                  `Interest Due: ₹${(d.interest_due / 1e7).toFixed(2)} Cr`
+                ];
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            title: {
+              display: true,
+              text: "O/S Amount (Cr)",
+              font: { size: 10 },
+              color: "#6a9cbf"
+            },
+            grid: { color: "#eaf3fb" },
+            ticks: {
+              font: { size: 9 },
+              color: "#6a9cbf"
+            }
+          },
+          y: {
+            title: {
+              display: true,
+              text: "Interest Rate (%)",
+              font: { size: 10 },
+              color: "#6a9cbf"
+            },
+            min: 8,
+            max: 12,
+            grid: { color: "#eaf3fb" },
+            ticks: {
+              font: { size: 9 },
+              color: "#6a9cbf",
+              callback: (v) => `${v}%`
+            }
+          }
+        }
+      }
+    });
+  };
+
+  const renderGroupLegend = (bpSummary) => {
+    const container = document.getElementById("borrGroupLegend");
+    if (!container) return;
+
+    const COLORS = ['#1565c0', '#0288d1', '#00acc1', '#42a5f5', '#90caf9'];
+
+    const total = bpSummary.reduce(
+      (sum, b) => sum + toNumber(b.exposure_amt),
+      0
+    );
+
+    container.innerHTML = bpSummary
+      .map((b, i) => {
+        const valueCr = toNumber(b.exposure_amt) / 1e7;
+        const pct = total ? ((b.exposure_amt / total) * 100).toFixed(1) : 0;
+
+        return `
+        <div class="legend-row">
+          <div class="legend-dot" style="background:${COLORS[i % COLORS.length]}"></div>
+          <div class="legend-label">${b.bp_group}</div>
+          <div class="legend-val">₹${valueCr.toFixed(2)} Cr</div>
+          <div class="legend-pct">${pct}%</div>
+        </div>
+      `;
+      })
+      .join("");
+  };
+  const initConcentDonutChart = (bpSummary) => {
+    if (!donutConcentRef.current || !bpSummary?.length) return;
+
+    if (donutConcentInstanceRef.current) {
+      donutConcentInstanceRef.current.destroy();
+    }
+
+    const ctx = donutConcentRef.current.getContext('2d');
+
+    donutConcentInstanceRef.current = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: bpSummary.map(b => b.bp_group),
+        datasets: [{
+          data: bpSummary.map(b => toNumber(b.exposure_amt) / 1e7), // convert to Cr
+          backgroundColor: ['#1565c0', '#0288d1', '#00acc1'],
+          borderWidth: 0,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: false,
+            position: 'bottom'
+          },
+          tooltip: {
+            callbacks: {
+              label: function (context) {
+                return `₹${context.raw.toFixed(2)} Cr`;
+              }
+            }
+          }
+        },
+        cutout: '65%'
+      }
+    });
+    renderGroupLegend(bpSummary);
+
+  };
+
   useEffect(() => {
     if (isActive && bpSummary?.length) {
       initBorrowerChart(bpSummary, mode);
+      initConcentDonutChart(bpSummary);
     }
     if (isActive && borrowers_full?.length) {
       initCustomerChart(borrowers_full);
@@ -502,6 +675,8 @@ export function BorrowersPage({ isActive = false, totals = {}, borrowers = [], b
       initInterestDueChart(borrowers_full);
       initInterestutilChart(borrowers_full);
       initActiveDisbChart(borrowers_full);
+      initCustomerBubbleChart(borrowers_full);
+
     }
 
     return () => {
@@ -529,24 +704,22 @@ export function BorrowersPage({ isActive = false, totals = {}, borrowers = [], b
         intUtilChartInstanceRef.current.destroy();
         intUtilChartInstanceRef.current = null;
       }
-      if(initActiveDisbInstanceRef.current) {
+      if (initActiveDisbInstanceRef.current) {
         initActiveDisbInstanceRef.current.destroy();
         initActiveDisbInstanceRef.current = null;
+      }
+      if (donutConcentInstanceRef.current) {
+        donutConcentInstanceRef.current.destroy();
+        donutConcentInstanceRef.current = null;
+      }
+      if (borrCustBubbleInstanceRef.current) {
+        borrCustBubbleInstanceRef.current.destroy();
+        borrCustBubbleInstanceRef.current = null;
       }
 
     };
   }, [bpSummary, isActive, borrowers_full]);
 
-  const borrowerCount = Array.isArray(borrowers_full) ? borrowers_full.length : 0;
-  const uniqueCounterparties = Array.isArray(borrowers_full)
-    ? new Set(borrowers_full.map((row) => row?.[5]).filter(Boolean)).size
-    : 0;
-  const avgDays = Array.isArray(borrowers) && borrowers.length
-    ? Math.round(
-      borrowers.reduce((sum, row) => sum + toNumber(row?.[13]), 0) / borrowers.length,
-    )
-    : 0;
-  const productCount = toNumber(totals.lv_prd_cnt);
 
   return (
     <div className={`page ${isActive ? 'active' : ''}`} id="page-transactions">
@@ -557,7 +730,7 @@ export function BorrowersPage({ isActive = false, totals = {}, borrowers = [], b
           <div class="port-kpi-body">
             <div class="port-kpi-top"><div class="port-kpi-icon">💰</div><span class="port-kpi-badge">Total</span></div>
             <div class="port-kpi-label">Total Borrower O/S</div>
-            <div class="port-kpi-value">{totals.total_os_amt}</div>
+            <div class="port-kpi-value">₹ {formatCrores(totals.total_os_amt)}</div>
             <div class="port-kpi-sub">Across 5 groups · 10 customers · 25 disbursements</div>
           </div>
         </div>
@@ -566,7 +739,7 @@ export function BorrowersPage({ isActive = false, totals = {}, borrowers = [], b
           <div class="port-kpi-body">
             <div class="port-kpi-top"><div class="port-kpi-icon">📊</div><span class="port-kpi-badge">Avg</span></div>
             <div class="port-kpi-label">Avg Exposure / Customer</div>
-            <div class="port-kpi-value">{totals.lv_avg_exp}</div>
+            <div class="port-kpi-value">₹ {formatCrores(totals.lv_avg_exp)}</div>
             <div class="port-kpi-sub">Mean O/S per customer · Range ₹1.45–₹22.00 Cr</div>
           </div>
         </div>
@@ -593,8 +766,11 @@ export function BorrowersPage({ isActive = false, totals = {}, borrowers = [], b
           <div class="port-kpi-body">
             <div class="port-kpi-top"><div class="port-kpi-icon">📈</div><span class="port-kpi-badge">Util</span></div>
             <div class="port-kpi-label">Portfolio Utilisation</div>
-            <div class="port-kpi-value">86.5%</div>
-            <div class="port-kpi-sub">O/S ÷ Sanctioned · ₹109.30 Cr sanctioned base</div>
+            <div className="port-kpi-value">
+              {totals?.loan_amt
+                ? ((totals.total_os_amt / totals.loan_amt) * 100).toFixed(2)
+                : "0.00"}%
+            </div>            <div class="port-kpi-sub">O/S ÷ Sanctioned · ₹109.30 Cr sanctioned base</div>
           </div>
         </div>
       </div>
@@ -624,7 +800,7 @@ export function BorrowersPage({ isActive = false, totals = {}, borrowers = [], b
         </div>
         <div class="chart-card">
           <div class="chart-header"><div><div class="chart-title">Group Share of Total Book</div><div class="chart-subtitle">% CONCENTRATION BY BP GROUP</div></div></div>
-          <div class="chart-wrap h220"><canvas id="borrGroupDonut"></canvas></div>
+          <div class="chart-wrap h220"><canvas ref={donutConcentRef}></canvas></div>
           <div id="borrGroupLegend" class="donut-legend" style={{ marginTop: "8px" }}></div>
         </div>
       </div>
@@ -676,7 +852,7 @@ export function BorrowersPage({ isActive = false, totals = {}, borrowers = [], b
         </div>
         <div class="chart-card">
           <div class="chart-header"><div><div class="chart-title">Customer Risk vs Exposure Scatter</div><div class="chart-subtitle">RATE (Y) · O/S AMT (X) · BUBBLE = INT DUE</div></div></div>
-          <div class="chart-wrap h260"><canvas id="borrCustBubble"></canvas></div>
+          <div class="chart-wrap h260"><canvas ref={borrCustBubbleRef}></canvas></div>
         </div>
       </div>
 
@@ -685,47 +861,48 @@ export function BorrowersPage({ isActive = false, totals = {}, borrowers = [], b
         <div class="card-title">All Borrower Groups — Full Detail <span class="card-badge">5 GROUPS · 10 CUSTOMERS</span></div>
         <table class="data-table">
           <thead><tr><th>#</th><th>BP Group</th><th>O/S (Cr)</th><th>Sanction (Cr)</th><th>Int Due (Cr)</th><th>% Share</th><th>Facilities</th><th>Risk Level</th></tr></thead>
-    <tbody>
-        {bpSummary.map((b, index) => (
-    <tr key={index}>
-      <td>{index + 1}</td>
-      <td>{b.bp_group}</td>
-      <td>{b.os_amt}</td>
+          <tbody>
+            {bpSummary.map((b, index) => (
+              <tr key={index}>
+                <td>{index + 1}</td>
+                <td>{b.bp_group}</td>
+                <td>{b.os_amt}</td>
 
-      <td>{(toNumber(b.sanction_amt) / 1e7).toFixed(2)}</td>
-      <td>{(toNumber(b.interest_due) / 1e7).toFixed(2)}</td>
-      <td>-</td>
-      <td>-</td>
+                <td>{(toNumber(b.sanction_amt) / 1e7).toFixed(2)}</td>
+                <td>{(toNumber(b.interest_due) / 1e7).toFixed(2)}</td>
+                <td>-</td>
+                <td>{b.disb_count || "-"}</td>
 
-    </tr>
-  ))}
-    </tbody>
-     </table>
+
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
       <div class="card">
         <div class="card-title">All Customers — Individual Detail <span class="card-badge">10 CUSTOMERS</span></div>
         <table class="data-table">
           <thead><tr><th>#</th><th>Customer</th><th>BP Group</th><th>O/S (Cr)</th><th>Sanction (Cr)</th><th>Int Due (Cr)</th><th>Rate %</th><th>Facilities</th><th>Utilisation</th></tr></thead>
-         <tbody>
-  {borrowers_full.map((b, index) => (
-    <tr key={index}>
-      <td>{index + 1}</td>
-      <td>{b.zborrower}</td>
-      <td>{b.bp_group}</td>
+          <tbody>
+            {borrowers_full.map((b, index) => (
+              <tr key={index}>
+                <td>{index + 1}</td>
+                <td>{b.zborrower}</td>
+                <td>{b.bp_group}</td>
 
-      <td>{(toNumber(b.os_amt) / 1e7).toFixed(2)}</td>
-      <td>{(toNumber(b.sanction_amt) / 1e7).toFixed(2)}</td>
-      <td>{(toNumber(b.interest_due) / 1e7).toFixed(2)}</td>
+                <td>{(toNumber(b.os_amt) / 1e7).toFixed(2)}</td>
+                <td>{(toNumber(b.sanction_amt) / 1e7).toFixed(2)}</td>
+                <td>{(toNumber(b.interest_due) / 1e7).toFixed(2)}</td>
 
-      <td>{toNumber(b.zinterest_rate).toFixed(2)}%</td>
+                <td>{toNumber(b.zinterest_rate).toFixed(2)}%</td>
 
-      {/* Facilities not in your data → show "-" */}
-      <td>-</td>
+                {/* Facilities not in your data → show "-" */}
+                <td>{b.active_disb || "-"}</td>
 
-      <td>{toNumber(b.utilization_rate).toFixed(2)}%</td>
-    </tr>
-  ))}
-</tbody>
+                <td>{toNumber(b.utilization_rate).toFixed(2)}%</td>
+              </tr>
+            ))}
+          </tbody>
         </table>
       </div>
 

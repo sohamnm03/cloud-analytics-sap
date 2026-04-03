@@ -35,7 +35,7 @@ function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [reportState, setReportState] = useState({
-    totals: {}, lenders: [], products: [], borrowers: [], portfolios: [], assets: [], sanctionVsOs: [], productBpExposure: [], bpSummary: [], borrowers_full: [], txnTypeSummary: [], topDisbByOs: [], currencySummary: []
+    totals: {}, lenders: [], products: [], borrowers: [], portfolios: [], assets: [], sanctionVsOs: [], productBpExposure: [], bpSummary: [], borrowers_full: [], txnTypeSummary: [], topDisbByOs: [], currencySummary: [], maturity: []
   });
 
   useEffect(() => {
@@ -100,6 +100,7 @@ function App() {
             txnTypeSummary: Array.isArray(rs.txnTypeSummary) ? rs.txnTypeSummary : [],
             topDisbByOs: Array.isArray(rs.topDisbByOs) ? rs.topDisbByOs : [],
             currencySummary: Array.isArray(rs.currencySummary) ? rs.currencySummary : [],
+          maturity: rs.maturity || {},
           });
           bootCofDashboard(dashboard);
         }
@@ -118,6 +119,7 @@ function App() {
   useEffect(() => {
     const id = window.setTimeout(() => activateDashboardPage(activePage), 0);
     return () => window.clearTimeout(id);
+  
   }, [activePage]);
 
   if (auth.status === "error") return <SessionError message={auth.error} />;
@@ -153,7 +155,11 @@ function App() {
           bpSummary={reportState.bpSummary}
           borrowers_full={reportState.borrowers_full}
         />
-        <MaturityPage isActive={activePage === "maturity"} />
+        <MaturityPage isActive={activePage === "maturity"}
+        totals={reportState.totals} 
+        maturity={reportState.maturity}
+        
+        />
         <TransactionsPage
           isActive={activePage === "transactions"}
           totals={reportState.totals}

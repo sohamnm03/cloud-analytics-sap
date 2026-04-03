@@ -416,7 +416,7 @@ if (currencySummary?.length > 0) {
             <span class="kpi-badge neutral">Rcvd</span>
           </div>
           <div class="kpi-label">Principal Received</div>
-          <div class="kpi-value">₹14.75</div>
+          <div class="kpi-value"> ₹{(Number(totals.total_prin_rec || 0) / 1e7).toFixed(2)}</div>
           <div class="kpi-sub">Total principal repaid across all facilities</div>
           <div class="kpi-spark"><div class="kpi-spark-fill" data-w="55"></div></div>
           <div class="kpi-divider"></div>

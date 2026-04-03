@@ -455,6 +455,8 @@ def calculate_cof_dashboard(filters: dict, raw_data=None):
     total_os_amt   = 0.0
     total_prin_rec = 0.0
     total_exposure = 0.0
+    total_sanction = 0.0
+    lv_long_os  = 0.0
     transaction_rows: list[list] = []
     product_asset_map: dict[str, dict[str, float]] = {}
     all_asset_classes: set[str] = set()
@@ -494,13 +496,44 @@ def calculate_cof_dashboard(filters: dict, raw_data=None):
         exit_eir = float(row.get("zexit_eir") or 0)
         avg_eir = float(row.get("zavg_rate_eir") or 0)
         avg_papm = float(row.get("zavg_rate_papm") or 0)
+        end_raw = str(
+            row.get("End Date") 
+            or row.get("end_date") 
+            or row.get("zend_date") 
+            or row.get("maturity_date") 
+            or ""
+        )
 
+        if len(end_raw) >= 4:
+            yr = end_raw[:4]
+            if yr.isdigit():
+                if yr not in maturity_map:
+                    maturity_map[yr] = {
+                        "os_amt": 0.0,
+                        "sanction_amt": 0.0,
+                        "utilization_amt": 0.0,
+                        "loan_amt": 0.0,
+                    }
+                maturity_map[yr]["os_amt"] += os_amt
+                maturity_map[yr]["sanction_amt"] += sanction_amt
+                maturity_map[yr]["loan_amt"] += loan_amt
+        for yr, vals in maturity_map.items():
+            sanc = vals.get("sanction_amt", 0.0)
+            os_val = vals.get("os_amt", 0.0)
+            loan_amt_maturity = vals.get("loan_amt", 0.0)            
+            vals["utilization_pct"] = round((os_val / sanc) * 100, 2) if sanc > 0 else 0.0 
+        lv_long_os = sum(
+        vals.get("os_amt", 0.0)
+        for year, vals in maturity_map.items()
+        if year.isdigit() and int(year) >= 2029
+        )           
         currency_map[curr] = currency_map.get(curr, 0.0) + os_amt
         customer_set.add(borrower)                   
         total_loan_amt += loan_amt
         total_os_amt    += os_amt
         total_prin_rec += princ_rec
         total_exposure += exp_amt
+        total_sanction += sanction_amt
         
         asset_classification_map[asset_class] = asset_classification_map.get(asset_class, 0.0) + os_amt
         bp_group = str(row.get("BP Grp Name") or "Others")
@@ -519,11 +552,15 @@ def calculate_cof_dashboard(filters: dict, raw_data=None):
             "os_amt": 0.0,
             "sanction_amt": 0.0,
             "interest_due": 0.0,
+            "exposure_amt": 0.0,
+            "disb_set": set()  
+
         }
 
         bp_summary_map[bp_group]["os_amt"] += os_amt
         bp_summary_map[bp_group]["sanction_amt"] += sanction_amt
         bp_summary_map[bp_group]["interest_due"] += interest_due
+        bp_summary_map[bp_group]["exposure_amt"] += exp_amt
 
         all_prd_types.add(ptype)
 
@@ -600,6 +637,7 @@ def calculate_cof_dashboard(filters: dict, raw_data=None):
             }
         if disb_no:  # string check
             disb_set.add(str(disb_no))
+            bp_summary_map[bp_group]["disb_set"].add(str(disb_no))
             borrowers_map[borrower]["active_disb"] += 1
         borrowers_map[borrower]["os_amt"] += os_amt
         borrowers_map[borrower]["interest_rate"] = interest_rate
@@ -651,33 +689,6 @@ def calculate_cof_dashboard(filters: dict, raw_data=None):
         else:
             lv_oth_b += closing
 
-        # maturity ladder — derive year from end_date
-        end_raw = _norm_date(row.get("zend_date") or row.get(
-            "end_date") or row.get("maturity_date") or "")
-        if len(end_raw) >= 4:
-            yr = end_raw[:4]
-            maturity_map[yr] = maturity_map.get(yr, 0.0) + closing
-
-        # transaction row (17 columns matching engine expectations):
-        # [0]prd_type [1]prd_desc [2]class_id [3]facility [4]txn_no
-        # [5]counterpty [6]rate_type [7]start_date [8]end_date
-        # [9]opening [10]closing [11]accrual [12]wt_int
-        # [13]days [14]wt_avg [15]avg_eir [16]portfolio
-        transaction_rows.append([
-            ptype, pdesc,
-            str(row.get("zclass_id") or ""),
-            str(row.get("zfacility") or ""),
-            str(row.get("ztxn_no") or ""),
-            cpty, rtype,
-            _fmt_date(_norm_date(row.get("zstart_date")
-                      or row.get("start_date") or "")),
-            _fmt_date(end_raw),
-            float(row.get("zopening_amt") or 0),
-            closing, accrual, wt_int,
-            int(row.get("zdays") or 0),
-            wt_avg, avg_eir,
-            portfo,
-        ])
         # Sanction vs O/S Gap
         if ptype not in sanction_vs_os_map:
             sanction_vs_os_map[ptype] = {
@@ -750,6 +761,8 @@ def calculate_cof_dashboard(filters: dict, raw_data=None):
                 "os_amt": round(vals["os_amt"], 2),
                 "sanction_amt": round(vals["sanction_amt"], 2),
                 "interest_due": round(vals["interest_due"], 2),
+                "exposure_amt": round(vals["exposure_amt"], 2),
+                "disb_count": len(vals["disb_set"]), 
                 "products": [
                     {
                         "prd_type": prd,
@@ -919,19 +932,20 @@ def calculate_cof_dashboard(filters: dict, raw_data=None):
     lo_eir_val = (lo["zavg_eir_sum"] / lo["zeir_cnt"]
                   ) if lo.get("zeir_cnt") else 9999
 
-    # maturity buckets
-    now_yr = int(__import__("datetime").date.today().year)
-    lv_mat_2026 = sum(v for yr, v in maturity_map.items()
-                      if yr <= str(now_yr + 1))
-    lv_mat_med = sum(v for yr, v in maturity_map.items()
-                     if str(now_yr + 2) <= yr <= str(now_yr + 4))
-    lv_mat_long = sum(v for yr, v in maturity_map.items()
-                      if yr > str(now_yr + 4))
+    lv_largest_year = ""
+    lv_largest_amt = 0.0
+    lv_mat_horizon = 0
 
-    peak_yr, peak_b = ("", 0.0)
     if maturity_map:
-        peak_yr = max(maturity_map, key=maturity_map.__getitem__)
-        peak_b = maturity_map[peak_yr]
+        years = [int(y) for y in maturity_map.keys() if y.isdigit()]
+        if years:
+            lv_mat_horizon = max(years) - min(years)
+    if maturity_map:
+        lv_largest_year = max(
+            maturity_map,
+            key=lambda y: maturity_map[y]["os_amt"]
+        )
+        lv_largest_amt = maturity_map[lv_largest_year]["os_amt"]
 
     # Sanction vs O/S Gap
 
@@ -940,6 +954,11 @@ def calculate_cof_dashboard(filters: dict, raw_data=None):
         "total_os_amt": round(total_os_amt,2),
         "total_prin_rec": round(total_prin_rec,2),
         "total_exposure": round(total_exposure),
+        "total_sanction": round(total_sanction, 2),
+        "lv_largest_year": lv_largest_year,
+        "lv_largest_year_amt": round(lv_largest_amt, 2),
+        "lv_mat_horizon": lv_mat_horizon,
+        "lv_long_os": round(lv_long_os, 2),
         "lv_avg_exp":   lv_avg_exp,
         "lv_top_prd":   lv_top_prd,
         "lv_hi_prd":    lv_hi_prd,
@@ -963,11 +982,6 @@ def calculate_cof_dashboard(filters: dict, raw_data=None):
         "lv_lo_eir_b":  round(lo.get("zclosing_amt", 0), 2),
         "lv_ha_prd":    ha.get("zprd_desc", ""),
         "lv_ha_acc":    round(ha.get("zaccrual_amt", 0), 2),
-        "lv_mat_2026":  round(lv_mat_2026, 2),
-        "lv_mat_med":   round(lv_mat_med,  2),
-        "lv_mat_long":  round(lv_mat_long, 2),
-        "lv_peak_b":    round(peak_b, 2),
-        "lv_peak_yr":   peak_yr,
         "lv_lend_cnt":  len(lenders),
         "lv_prd_cnt":   len(products),
         "lv_cust_cnt":  customer_count,
