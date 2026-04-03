@@ -465,8 +465,7 @@ export function OverviewPage({ isActive = false, totals = {}, products = [], bor
             beginAtZero: true,
             grid: { color: '#eaf3fb' },
             title: {
-              display: true,
-              text: 'Rs Crores'
+              display: false,
             }
           }
         }

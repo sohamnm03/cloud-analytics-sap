@@ -98,8 +98,7 @@ export function PortfolioPage({ isActive = false, totals = {}, products = [] }) 
             beginAtZero: true,
             grid: { color: '#eaf3fb' },
             title: {
-              display: true,
-              text: 'Rs Crores'
+              display: false,
             }
           }
         }
@@ -249,8 +248,7 @@ export function PortfolioPage({ isActive = false, totals = {}, products = [] }) 
               callback: v => `${v} Cr`
             },
             title: {
-              display: true,
-              text: 'Rs Crores'
+              display: false,
             }
           }
         }

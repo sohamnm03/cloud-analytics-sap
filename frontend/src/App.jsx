@@ -35,7 +35,7 @@ function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [reportState, setReportState] = useState({
-    totals: {}, lenders: [], products: [], borrowers: [], portfolios: [], assets: [], sanctionVsOs: [], productBpExposure: [], bpSummary: [], borrowers_full: [], txnTypeSummary: [], topDisbByOs: [], currencySummary: [], maturity: []
+    totals: {}, lenders: [], products: [], borrowers: [], portfolios: [], assets: [], sanctionVsOs: [], productBpExposure: [], bpSummary: [], borrowers_full: [], txnTypeSummary: [], topDisbByOs: [], currencySummary: [], maturity: [], transactions: []
   });
 
   useEffect(() => {
@@ -100,7 +100,8 @@ function App() {
             txnTypeSummary: Array.isArray(rs.txnTypeSummary) ? rs.txnTypeSummary : [],
             topDisbByOs: Array.isArray(rs.topDisbByOs) ? rs.topDisbByOs : [],
             currencySummary: Array.isArray(rs.currencySummary) ? rs.currencySummary : [],
-          maturity: rs.maturity || {},
+            maturity: rs.maturity || {},
+            transactions: Array.isArray(rs.transactions) ? rs.transactions : []
           });
           bootCofDashboard(dashboard);
         }
@@ -169,7 +170,6 @@ function App() {
           topDisbByOs={reportState.topDisbByOs}
           bpSummary={reportState.bpSummary}
           currencySummary={reportState.currencySummary}
-
         />
         <LendersPage
           isActive={activePage === "lenders"}

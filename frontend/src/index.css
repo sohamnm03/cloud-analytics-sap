@@ -1,43 +1,38 @@
 @import url("https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500;700&family=DM+Sans:wght@400;500;600;700&display=swap");
 
 /* ===== COF DASHBOARD v7 — glassmorphism + light/dark ===== */
-:root {
-  --bg: #eaf3fb;
-  --bg2: #ddeef9;
-  --bg-base: #ffffff;
-  --white: #ffffff;
-  --card: rgba(255, 255, 255, 0.85);
-  --border: rgba(204, 224, 245, 0.7);
-  --border2: #b0ceeb;
-  --blue-dark: #1565c0;
-  --blue: #1e88e5;
-  --blue-mid: #42a5f5;
-  --blue-light: #90caf9;
-  --blue-pale: #e3f2fd;
-  --blue-pale2: #bbdefb;
-  --sky: #0288d1;
-  --sky-pale: #e1f5fe;
-  --teal: #00acc1;
-  --teal-pale: #e0f7fa;
-  --green: #2e7d32;
-  --green-light: #43a047;
-  --green-pale: #e8f5e9;
-  --orange: #fb8c00;
-  --orange-pale: #fff3e0;
-  --red: #e53935;
-  --red-pale: #ffebee;
-  --text: #0d2a4a;
-  --text-sub: #2e6090;
-  --text-muted: #6a9cbf;
-  --shadow:
-    0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.02),
-    0 0 0 1px rgba(204, 224, 245, 0.5);
-  --shadow-hover:
-    0 20px 25px -5px rgba(30, 136, 229, 0.12),
-    0 10px 10px -5px rgba(30, 136, 229, 0.06);
-  --transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-  --blur: blur(12px);
-}
+    :root {
+      --bg: #eaf3fb;
+      --bg2: #ddeef9;
+      --white: #ffffff;
+      --card: rgba(255, 255, 255, 0.85);
+      --border: rgba(204, 224, 245, 0.7);
+      --border2: #b0ceeb;
+      --blue-dark: #1565c0;
+      --blue: #1e88e5;
+      --blue-mid: #42a5f5;
+      --blue-light: #90caf9;
+      --blue-pale: #e3f2fd;
+      --blue-pale2: #bbdefb;
+      --sky: #0288d1;
+      --sky-pale: #e1f5fe;
+      --teal: #00acc1;
+      --teal-pale: #e0f7fa;
+      --green: #2e7d32;
+      --green-light: #43a047;
+      --green-pale: #e8f5e9;
+      --orange: #fb8c00;
+      --orange-pale: #fff3e0;
+      --red: #e53935;
+      --red-pale: #ffebee;
+      --text: #0d2a4a;
+      --text-sub: #2e6090;
+      --text-muted: #6a9cbf;
+      --shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.02), 0 0 0 1px rgba(204, 224, 245, 0.5);
+      --shadow-hover: 0 20px 25px -5px rgba(30, 136, 229, 0.12), 0 10px 10px -5px rgba(30, 136, 229, 0.06);
+      --transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      --blur: blur(12px);
+    }
 
 [data-theme="dark"] {
   --bg: #0a1628;
@@ -358,20 +353,19 @@ header {
   padding: 22px 24px 20px;
 }
 
-.kpi-card {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 20px;
-  position: relative;
-  overflow: hidden;
-  box-shadow: var(--shadow);
-  backdrop-filter: var(--blur);
-  -webkit-backdrop-filter: var(--blur);
-  transition:
-    box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1),
-    transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
-    background 0.4s ease;
-}
+    .kpi-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 0;
+      position: relative;
+      overflow: hidden;
+      box-shadow: var(--shadow);
+      backdrop-filter: var(--blur);
+      -webkit-backdrop-filter: var(--blur);
+      transition: box-shadow 0.3s, transform 0.3s, background 0.4s;
+      cursor: default
+    }
 
 .kpi-card:hover {
   box-shadow: var(--shadow-hover);
@@ -464,20 +458,20 @@ header {
 }
 
 .kpi-card.c1 .kpi-value {
-  color: var(--blue-dark)
-}
+      color: var(--blue-dark)
+    }
 
-.kpi-card.c2 .kpi-value {
-  color: #00838f
-}
+    .kpi-card.c2 .kpi-value {
+      color: #00838f
+    }
 
-.kpi-card.c3 .kpi-value {
-  color: #e65100
-}
+    .kpi-card.c3 .kpi-value {
+      color: #e65100
+    }
 
-.kpi-card.c4 .kpi-value {
-  color: #0277bd
-}
+    .kpi-card.c4 .kpi-value {
+      color: #0277bd
+    }
 
 .kpi-card.c1 .kpi-footer-dot {
   background: #1565c0;

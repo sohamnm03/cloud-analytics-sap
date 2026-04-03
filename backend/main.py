@@ -503,7 +503,25 @@ def calculate_cof_dashboard(filters: dict, raw_data=None):
             or row.get("maturity_date") 
             or ""
         )
-
+        transaction_rows.append({
+            "prd_type": ptype,
+            "prd_type_desc": pdesc,
+            "dis_no": str(disb_no),
+            "customer_name": borrower,
+            "bp_group": bp_group,
+            "txn_type_desc": txn_type_desc,
+            "portfolio_desc": portfolio,
+            "start_date": str(row.get("Start Date") or ""),
+            "end_date": end_raw,
+            "currency": curr,
+            "int_rate": interest_rate,
+            "loan_amt": round(loan_amt, 2),
+            "os_amt": round(os_amt, 2),
+            "interest_due": round(interest_due, 2),
+            "total_interest_amt": round(int_rate, 2),  
+            "upcoming_interest": round(_to_float(row.get("Upcoming Int")), 2),
+            "asset_classification": asset_class
+        })
         if len(end_raw) >= 4:
             yr = end_raw[:4]
             if yr.isdigit():

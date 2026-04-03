@@ -662,7 +662,19 @@ export function BorrowersPage({ isActive = false, totals = {}, borrowers = [], b
     renderGroupLegend(bpSummary);
 
   };
+  const concentrationRisk = (() => {
+    if (!bpSummary?.length || !totals?.total_os_amt) return 0;
 
+    const sorted = [...bpSummary].sort(
+      (a, b) => toNumber(b.os_amt) - toNumber(a.os_amt)
+    );
+
+    const top2Sum = sorted
+      .slice(0, 2)
+      .reduce((sum, item) => sum + toNumber(item.os_amt), 0);
+
+    return (top2Sum / toNumber(totals.total_os_amt)) * 100;
+  })();
   useEffect(() => {
     if (isActive && bpSummary?.length) {
       initBorrowerChart(bpSummary, mode);
@@ -757,7 +769,7 @@ export function BorrowersPage({ isActive = false, totals = {}, borrowers = [], b
           <div class="port-kpi-body">
             <div class="port-kpi-top"><div class="port-kpi-icon">🎯</div><span class="port-kpi-badge">HHI</span></div>
             <div class="port-kpi-label">Concentration Risk (Top-2)</div>
-            <div class="port-kpi-value">65.3%</div>
+            <div class="port-kpi-value">  {concentrationRisk.toFixed(1)}%</div>
             <div class="port-kpi-sub">Adani + L&amp;T hold 65.3% of total O/S book</div>
           </div>
         </div>

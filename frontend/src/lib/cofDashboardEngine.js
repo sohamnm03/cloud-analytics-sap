@@ -1184,7 +1184,7 @@ function renderTxnTable() {
 
   const countLabel = document.getElementById('txnCountLabel');
   if (countLabel) {
-    countLabel.textContent = `Showing ${total ? start + 1 : 0}–${Math.min(start + txnPerPage, total)} of ${total}`;
+    // countLabel.textContent = `Showing ${total ? start + 1 : 0}–${Math.min(start + txnPerPage, total)} of ${total}`;
   }
 
   const tbody = document.getElementById('txnTbody');
