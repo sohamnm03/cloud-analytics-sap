@@ -343,6 +343,13 @@ export function TransactionsPage({ isActive = false, totals = {}, transactions =
         return num.toLocaleString("en-IN"); // raw
     }
   }
+  const getPageNumbers = () => {
+  const pages = [];
+  for (let i = 1; i <= totalPages; i++) {
+    pages.push(i);
+  }
+  return pages;
+};
   useEffect(() => {
     if (!isActive) return;
 
@@ -438,12 +445,12 @@ export function TransactionsPage({ isActive = false, totals = {}, transactions =
               <div class="kpi-icon-wrap"><svg viewBox="0 0 24 24"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8z" /></svg></div>
               <span class="kpi-badge warn">Monitor</span>
             </div>
-            <div class="kpi-label">Watch Accounts</div>
-            <div class="kpi-value">5</div>
-            <div class="kpi-sub">Watch (2) + Special Mention (4) disbursements</div>
+            <div class="kpi-label">Total Customers</div>
+            <div class="kpi-value">{totals.lv_cust_cnt}</div>
+            <div class="kpi-sub">Customers with active loans</div>
             <div class="kpi-spark"><div class="kpi-spark-fill" data-w="48"></div></div>
             <div class="kpi-divider"></div>
-            <div class="kpi-footer"><div class="kpi-footer-dot"></div><span>₹<strong>31.25</strong> Cr under monitoring</span></div>
+            <div class="kpi-footer"><div class="kpi-footer-dot"></div><span><strong>{totals.lv_cust_cnt}</strong> Customers under monitoring</span></div>
           </div>
         </div>
 
@@ -453,12 +460,12 @@ export function TransactionsPage({ isActive = false, totals = {}, transactions =
               <div class="kpi-icon-wrap"><svg viewBox="0 0 24 24"><path d="M4 10v7h3v-7H4zm6.5 0v7h3v-7h-3zM2 22h19v-3H2v3zm15-12v7h3v-7h-3zM11.5 1L2 6v2h19V6l-9.5-5z" /></svg></div>
               <span class="kpi-badge neutral">Rcvd</span>
             </div>
-            <div class="kpi-label">Principal Received</div>
-            <div class="kpi-value"> ₹{(Number(totals.total_prin_rec || 0) / 1e7).toFixed(2)}</div>
-            <div class="kpi-sub">Total principal repaid across all facilities</div>
+            <div class="kpi-label">Total Assets</div>
+            <div class="kpi-value"> {totals.lv_asset_class_cnt}</div>
+            <div class="kpi-sub">Total assets recorded across all facilities</div>
             <div class="kpi-spark"><div class="kpi-spark-fill" data-w="55"></div></div>
             <div class="kpi-divider"></div>
-            <div class="kpi-footer"><div class="kpi-footer-dot"></div><span>₹<strong>2.79</strong> Cr interest received</span></div>
+            <div class="kpi-footer"><div class="kpi-footer-dot"></div><span><strong>{totals.lv_asset_class_cnt}</strong> Assets recorded</span></div>
           </div>
         </div>
       </div>
@@ -704,27 +711,58 @@ export function TransactionsPage({ isActive = false, totals = {}, transactions =
           </table>
         </div>
 
-        <div className="txn-pagination">
-          <span className="txn-pg-info">
-            Page {currentPage} of {totalPages || 1}
-          </span>
+<div className="txn-pagination">
+  <span className="txn-pg-info">
+    Page {currentPage} of {totalPages || 1}
+  </span>
 
-          <div className="txn-pg-btns">
-            <button
-              disabled={currentPage === 1}
-              onClick={() => setCurrentPage(p => p - 1)}
-            >
-              Prev
-            </button>
+  <div className="txn-pg-btns">
 
-            <button
-              disabled={currentPage === totalPages}
-              onClick={() => setCurrentPage(p => p + 1)}
-            >
-              Next
-            </button>
-          </div>
-        </div>
+    {/* First */}
+    <button
+      disabled={currentPage === 1}
+      onClick={() => setCurrentPage(1)}
+    >
+      «
+    </button>
+
+    {/* Prev */}
+    <button
+      disabled={currentPage === 1}
+      onClick={() => setCurrentPage(p => p - 1)}
+    >
+      ‹
+    </button>
+
+    {/* Page Numbers */}
+    {getPageNumbers().map((page) => (
+      <button
+        key={page}
+        className={currentPage === page ? "active" : ""}
+        onClick={() => setCurrentPage(page)}
+      >
+        {page}
+      </button>
+    ))}
+
+    {/* Next */}
+    <button
+      disabled={currentPage === totalPages}
+      onClick={() => setCurrentPage(p => p + 1)}
+    >
+      ›
+    </button>
+
+    {/* Last */}
+    <button
+      disabled={currentPage === totalPages}
+      onClick={() => setCurrentPage(totalPages)}
+    >
+      »
+    </button>
+
+  </div>
+</div>
       </div>
     </div>
   );

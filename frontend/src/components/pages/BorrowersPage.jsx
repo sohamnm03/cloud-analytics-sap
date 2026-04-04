@@ -461,7 +461,18 @@ export function BorrowersPage({ isActive = false, totals = {}, borrowers = [], b
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
-          legend: { display: false }
+          legend: { display: false },
+          tooltip: {
+            displayColors: false,
+            callbacks: {
+              title: (ctx) => {
+                return ctx[0].label; // only name
+              },
+              label: (ctx) => {
+                return `${ctx.raw}`; // ONLY number
+              }
+            }
+          }
         },
         scales: {
           x: {
@@ -477,7 +488,7 @@ export function BorrowersPage({ isActive = false, totals = {}, borrowers = [], b
             ticks: {
               color: "#6a9cbf",
               font: { size: 10 },
-              callback: (v) => `${v}%`
+              callback: (v) => `${v}`
             }
           }
         }
@@ -575,8 +586,7 @@ export function BorrowersPage({ isActive = false, totals = {}, borrowers = [], b
           },
           y: {
             title: {
-              display: true,
-              text: "Interest Rate (%)",
+              display: false,
               font: { size: 10 },
               color: "#6a9cbf"
             },
@@ -662,19 +672,46 @@ export function BorrowersPage({ isActive = false, totals = {}, borrowers = [], b
     renderGroupLegend(bpSummary);
 
   };
-  const concentrationRisk = (() => {
-    if (!bpSummary?.length || !totals?.total_os_amt) return 0;
+  const { concentrationRisk, topGroupsText } = (() => {
+    if (!bpSummary?.length || !totals?.total_os_amt) {
+      return { concentrationRisk: 0, topGroupsText: "" };
+    }
 
     const sorted = [...bpSummary].sort(
       (a, b) => toNumber(b.os_amt) - toNumber(a.os_amt)
     );
 
-    const top2Sum = sorted
-      .slice(0, 2)
-      .reduce((sum, item) => sum + toNumber(item.os_amt), 0);
+    // 👉 top 2 groups
+    const top2 = sorted.slice(0, 2);
 
-    return (top2Sum / toNumber(totals.total_os_amt)) * 100;
+    const top2Sum = top2.reduce(
+      (sum, item) => sum + toNumber(item.os_amt),
+      0
+    );
+
+    const concentrationRisk =
+      (top2Sum / toNumber(totals.total_os_amt)) * 100;
+
+    // 👉 build text like "Adani + L&T"
+    const topGroupsText = top2.map(g => g.bp_group).join(" + ");
+
+    return { concentrationRisk, topGroupsText };
   })();
+  function getRateClass(rate) {
+    const r = toNumber(rate);
+
+    if (r >= 10) return "pill red";
+    if (r >= 9) return "pill orange";
+    return "pill blue";
+  }
+
+  function getUtilClass(util) {
+    const u = toNumber(util);
+
+    if (u >= 85) return "pill orange";
+    if (u >= 80) return "pill yellow";
+    return "pill blue";
+  }
   useEffect(() => {
     if (isActive && bpSummary?.length) {
       initBorrowerChart(bpSummary, mode);
@@ -755,23 +792,15 @@ export function BorrowersPage({ isActive = false, totals = {}, borrowers = [], b
             <div class="port-kpi-sub">Mean O/S per customer · Range ₹1.45–₹22.00 Cr</div>
           </div>
         </div>
-        <div class="port-kpi pk3">
-          <div class="port-kpi-accent"></div>
-          <div class="port-kpi-body">
-            <div class="port-kpi-top"><div class="port-kpi-icon">⚠️</div><span class="port-kpi-badge">Watch</span></div>
-            <div class="port-kpi-label">Watch / NPA Exposure</div>
-            <div class="port-kpi-value">₹31.25 Cr</div>
-            <div class="port-kpi-sub">33.1% of book · 6 disbursements under monitoring</div>
-          </div>
-        </div>
         <div class="port-kpi pk4">
           <div class="port-kpi-accent"></div>
           <div class="port-kpi-body">
             <div class="port-kpi-top"><div class="port-kpi-icon">🎯</div><span class="port-kpi-badge">HHI</span></div>
             <div class="port-kpi-label">Concentration Risk (Top-2)</div>
             <div class="port-kpi-value">  {concentrationRisk.toFixed(1)}%</div>
-            <div class="port-kpi-sub">Adani + L&amp;T hold 65.3% of total O/S book</div>
-          </div>
+            <div className="port-kpi-sub">
+              {topGroupsText} hold {concentrationRisk.toFixed(1)}% of total O/S book
+            </div>          </div>
         </div>
         <div class="port-kpi pk5">
           <div class="port-kpi-accent"></div>
@@ -824,9 +853,8 @@ export function BorrowersPage({ isActive = false, totals = {}, borrowers = [], b
           <div class="chart-wrap h280"><canvas ref={custChartRef}></canvas></div>
         </div>
         <div class="chart-card">
-          <div class="chart-header"><div><div class="chart-title">Cumulative Concentration</div><div class="chart-subtitle">TOP-N BORROWER GROUPS — CUMULATIVE %</div></div></div>
-          <div class="chart-wrap h180"><canvas id="borrCumulChart"></canvas></div>
-          <div class="insight-box" style={{ marginTop: "12px" }}><strong>Insight:</strong> Top 2 groups (Adani + L&amp;T) account for <strong>65.3%</strong> of the book — significant concentration risk requiring monitoring.</div>
+          <div class="chart-header"><div><div class="chart-title">Customer Risk vs Exposure Scatter</div><div class="chart-subtitle">RATE (Y) · O/S AMT (X) · BUBBLE = INT DUE</div></div></div>
+          <div class="chart-wrap h260"><canvas ref={borrCustBubbleRef}></canvas></div>
         </div>
       </div>
 
@@ -856,17 +884,14 @@ export function BorrowersPage({ isActive = false, totals = {}, borrowers = [], b
         </div>
       </div>
 
-      <div class="section-label">Customer Multi-Metric Radar &amp; Utilisation</div>
+      {/* <div class="section-label">Customer Multi-Metric Radar &amp; Utilisation</div>
       <div class="two-col">
         <div class="chart-card">
           <div class="chart-header"><div><div class="chart-title">Customer Utilisation Rate (%)</div><div class="chart-subtitle">O/S ÷ SANCTIONED × 100 · BY CUSTOMER</div></div></div>
           <div class="chart-wrap h260"><canvas ref={intUtilChartRef}></canvas></div>
         </div>
-        <div class="chart-card">
-          <div class="chart-header"><div><div class="chart-title">Customer Risk vs Exposure Scatter</div><div class="chart-subtitle">RATE (Y) · O/S AMT (X) · BUBBLE = INT DUE</div></div></div>
-          <div class="chart-wrap h260"><canvas ref={borrCustBubbleRef}></canvas></div>
-        </div>
-      </div>
+
+      </div> */}
 
       <div class="section-label">Borrower &amp; Customer Detail Tables</div>
       <div class="card" style={{ marginBottom: "14px" }}>
@@ -906,12 +931,21 @@ export function BorrowersPage({ isActive = false, totals = {}, borrowers = [], b
                 <td>{(toNumber(b.sanction_amt) / 1e7).toFixed(2)}</td>
                 <td>{(toNumber(b.interest_due) / 1e7).toFixed(2)}</td>
 
-                <td>{toNumber(b.zinterest_rate).toFixed(2)}%</td>
+                <td>
+                  <span className={getRateClass(b.zinterest_rate)}>
+                    ● {toNumber(b.zinterest_rate).toFixed(2)}%
+                  </span>
+                </td>
 
-                {/* Facilities not in your data → show "-" */}
                 <td>{b.active_disb || "-"}</td>
+                <td>
+                  <span className={getUtilClass(b.utilization_rate)}>
+                    ● {toNumber(b.utilization_rate).toFixed(2)}%
+                  </span>
+                </td>
 
-                <td>{toNumber(b.utilization_rate).toFixed(2)}%</td>
+
+
               </tr>
             ))}
           </tbody>

@@ -132,19 +132,19 @@ def decode_jwt(authorization: Optional[str]) -> dict:
     except jwt.InvalidTokenError as exc:
         raise HTTPException(status_code=401, detail=f"Invalid token: {exc}")
 
-def read_json_file():
-    with open("test-data.json", "r") as f:
-        rows = json.load(f)
+# def read_json_file():
+#     with open("test-data.json", "r") as f:
+#         rows = json.load(f)
 
-    print("===== ROWS =====")
+#     print("===== ROWS =====")
 
-    for i, row in enumerate(rows):
-        print(f"\n--- Row {i+1} ---")
-        for key, value in row.items():
-            print(f"{key} : {value}")
+#     for i, row in enumerate(rows):
+#         print(f"\n--- Row {i+1} ---")
+#         for key, value in row.items():
+#             print(f"{key} : {value}")
 
-    return rows
-read_json_file()
+#     return rows
+# read_json_file()
 
 def _extract_cof_rows(payload: Any) -> list:
     if isinstance(payload, list):
@@ -278,55 +278,32 @@ def session_create(
         "expires_in":  claims["exp"] - int(time.time()),
     }
 
-
 @app.post("/data/query")
 def data_query(
     req: DataQueryRequest,
-    authorization: Optional[str] = Header(None),
+    # authorization: Optional[str] = Header(None),
 ):
-    """
-    Returns chart-ready JSON.
-    For session-backed dashboards (COF etc.): pass session_id.
-    For local dev/testing: pass raw_data directly in the body.
-    """
-    decode_jwt(authorization)
-# logic written to read json file data and perform calculation
-    resolved_raw_data = read_json_file()
-    print("===== DATA FROM api FILE =====")
-    print(resolved_raw_data)
+    # decode_jwt(authorization)
 
-    for i, row in enumerate(resolved_raw_data):
-        print(f"\n--- Row {i+1} ---")
-        for key, value in row.items():
-            print(f"{key} : {value}")
+    # ✅ Get data from request
+    resolved_raw_data = None
 
-    # Resolve raw_data: session_id takes priority over inline raw_data
-    # resolved_raw_data = req.raw_data
     if req.session_id:
         session = _SESSION_STORE.get(req.session_id)
         if not session:
-            raise HTTPException(
-                status_code=404,
-                detail="Session not found or expired. Relaunch from SAP.",
-            )
+            raise HTTPException(status_code=404, detail="Session expired")
         resolved_raw_data = session.get("raw_data")
 
-    routes = {
-        "borrowings_summary": calculate_borrowings_summary,
-        "maturity_profile":   calculate_maturity_profile,
-        "interest_rate_mix":  calculate_interest_rate_mix,
-        "currency_exposure":  calculate_currency_exposure,
-        "cof_dashboard":      calculate_cof_dashboard,
-    }
+    elif req.raw_data:
+        resolved_raw_data = req.raw_data
 
-    fn = routes.get(req.query_type)
-    if not fn:
+    if not resolved_raw_data:
         raise HTTPException(
-            status_code=400, detail=f"Unknown query_type: {req.query_type!r}")
+            status_code=400,
+            detail="No data provided",
+        )
 
-    return fn(req.filters, resolved_raw_data)
-
-
+    return calculate_cof_dashboard(req.filters, resolved_raw_data)
 @app.post("/api/query/cof_dashboard")
 def query_cof_dashboard( req: CofDashboardRequest, authorization: Optional[str] = Header(None), ): 
     """Direct COF endpoint — accepts rows inline. JWT required.""" 
@@ -628,8 +605,7 @@ def calculate_cof_dashboard(filters: dict, raw_data=None):
         p["zint_rate"] += int_rate
         p["zwt_avg_amt"] += wt_avg
         p["zavg_funds"] += avg_f
-        p["zwt_int_amt"] += wt_int
-        p["zdrawdown_rate"] = round((p["zos_amt"] / p["zsanction_amt"]) * 100, 2)    
+        p["zwt_int_amt"] += wt_int 
         p["zexposure"] = round(p["zsanction_amt"] - p["zos_amt"], 2)     
         p["zinterest_ratio"] = round((p["zinterest_due"] / p["zos_amt"]) * 100, 2) if p["zos_amt"] > 0 else 0.0
         if avg_eir:
@@ -924,31 +900,9 @@ def calculate_cof_dashboard(filters: dict, raw_data=None):
             lv_top_os_amt = 0.0
             lv_hi_int_amt = 0.0
             lv_lo_int_amt = 0.0
-    # ── portfolio-level totals ─────────────────────────────────────────────
-    lv_total_b = sum(p["zclosing_amt"] for p in products)
-    lv_total_acc = sum(p["zaccrual_amt"] for p in products)
-    lv_total_wt = sum(p["zwt_avg_amt"] for p in products)
-    lv_total_af = sum(p["zavg_funds"] for p in products)
-    lv_total_ia = sum(p["zwt_int_amt"] for p in products)
 
-    # weighted average EIR
-    wt_eir_num = sum(
-        p["zavg_eir_sum"] / p["zeir_cnt"] * p["zclosing_amt"]
-        for p in products if p["zeir_cnt"] > 0
-    )
-    lv_avg_eir = round(wt_eir_num / lv_total_b, 4) if lv_total_b else 0.0
-    lv_avg_exp = round(total_os_amt / customer_count, 2) if customer_count > 0 else 0.0
-    top = products[0] if products else {}
-    hi = max((p for p in products if p["zeir_cnt"] > 0),
-             key=lambda p: p["zavg_eir_sum"] / p["zeir_cnt"], default={})
-    lo = min((p for p in products if p["zeir_cnt"] > 0),
-             key=lambda p: p["zavg_eir_sum"] / p["zeir_cnt"], default={})
-    ha = max(products, key=lambda p: p["zaccrual_amt"], default={})
 
-    hi_eir_val = (hi["zavg_eir_sum"] / hi["zeir_cnt"]
-                  ) if hi.get("zeir_cnt") else 0
-    lo_eir_val = (lo["zavg_eir_sum"] / lo["zeir_cnt"]
-                  ) if lo.get("zeir_cnt") else 9999
+  
 
     lv_largest_year = ""
     lv_largest_amt = 0.0
@@ -977,40 +931,20 @@ def calculate_cof_dashboard(filters: dict, raw_data=None):
         "lv_largest_year_amt": round(lv_largest_amt, 2),
         "lv_mat_horizon": lv_mat_horizon,
         "lv_long_os": round(lv_long_os, 2),
-        "lv_avg_exp":   lv_avg_exp,
+        "lv_asset_class_cnt": len(all_asset_classes),
         "lv_top_prd":   lv_top_prd,
         "lv_hi_prd":    lv_hi_prd,
         "lv_lo_prd":    lv_lo_prd,
         "lv_disb_cnt": len(disb_set),
-        "lv_fixed_b":   round(lv_fixed_b, 2),
-        "lv_float_b":   round(lv_float_b, 2),
-        "lv_sec_b":     round(lv_sec_b,   2),
-        "lv_uns_b":     round(lv_uns_b,   2),
-        "lv_oth_b":     round(lv_oth_b,   2),
-        "lv_total_b":   round(lv_total_b,  2),
-        "lv_total_acc": round(lv_total_acc, 2),
-        "lv_total_wt":  round(lv_total_wt,  2),
-        "lv_total_af":  round(lv_total_af,  2),
-        "lv_total_ia":  round(lv_total_ia,  2),
-        "lv_avg_eir":   round(lv_avg_eir,   4),
-        "lv_top_cl":    round(top.get("zclosing_amt", 0), 2),
-        "lv_hi_eir_val": round(hi_eir_val, 4),
-        "lv_hi_eir_b":  round(hi.get("zclosing_amt", 0), 2),
-        "lv_lo_eir_val": round(lo_eir_val, 4),
-        "lv_lo_eir_b":  round(lo.get("zclosing_amt", 0), 2),
-        "lv_ha_prd":    ha.get("zprd_desc", ""),
-        "lv_ha_acc":    round(ha.get("zaccrual_amt", 0), 2),
-        "lv_lend_cnt":  len(lenders),
         "lv_prd_cnt":   len(products),
         "lv_cust_cnt":  customer_count,
-        "total":        round(lv_total_b, 2),
     }
 
     return {
         "query_type": "cof_dashboard",
         "render_state": {
             "products":     products,
-            "lenders":      lenders,
+            # "lenders":      lenders,
             "maturity":     maturity_map,
             "transactions": transaction_rows,
             "borrowers":   top_borrowers_five,

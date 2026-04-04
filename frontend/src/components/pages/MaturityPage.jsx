@@ -142,7 +142,7 @@ export function MaturityPage({ isActive = false, totals = {}, maturity = [] }) {
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
-          legend: { display: true }
+          legend: { display: false }
         },
         scales: {
           x: {
@@ -179,10 +179,7 @@ export function MaturityPage({ isActive = false, totals = {}, maturity = [] }) {
 
     const ctx = OsShareLineRef.current.getContext("2d");
 
-    // O/S values
     const osVals = years.map(y => toNumber(maturityObj[y]?.os_amt));
-
-    // % of total O/S
     const sharePct = osVals.map(v =>
       totalOs > 0 ? parseFloat(((v / totalOs) * 100).toFixed(1)) : 0
     );
@@ -215,7 +212,7 @@ export function MaturityPage({ isActive = false, totals = {}, maturity = [] }) {
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
-          legend: { display: true }
+          legend: { display: false }
         },
         scales: {
           x: {
@@ -295,7 +292,7 @@ export function MaturityPage({ isActive = false, totals = {}, maturity = [] }) {
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
-          legend: { display: true }
+          legend: { display: false }
         },
         scales: {
           x: {
@@ -331,15 +328,12 @@ export function MaturityPage({ isActive = false, totals = {}, maturity = [] }) {
 
     const ctx = redemptionPctRef.current.getContext("2d");
 
-    // O/S values
     const osVals = years.map(y => toNumber(maturityObj[y]?.os_amt));
 
-    // % of total book
     const redPct = osVals.map(v =>
       totalOs > 0 ? parseFloat(((v / totalOs) * 100).toFixed(1)) : 0
     );
 
-    // same bucket colors logic
     const colors = years.map(y =>
       y <= 2026 ? "#e53935" :
         y <= 2028 ? "#fb8c00" :
@@ -367,7 +361,7 @@ export function MaturityPage({ isActive = false, totals = {}, maturity = [] }) {
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
-          legend: { display: true }
+          legend: { display: false }
         },
         scales: {
           x: {
@@ -440,7 +434,7 @@ export function MaturityPage({ isActive = false, totals = {}, maturity = [] }) {
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
-          legend: { display: true }
+          legend: { display: false }
         },
         scales: {
           x: {
@@ -512,7 +506,7 @@ export function MaturityPage({ isActive = false, totals = {}, maturity = [] }) {
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
-          legend: { display: true }
+          legend: { display: false }
         },
         scales: {
           x: {
@@ -620,9 +614,9 @@ export function MaturityPage({ isActive = false, totals = {}, maturity = [] }) {
     .sort((a, b) => a.year - b.year);
 
   const getBucket = (year) => {
-    if (year <= 2026) return "Short";
-    if (year <= 2028) return "Medium";
-    return "Long";
+    if (year <= 2026) return "Short-term";
+    if (year <= 2028) return "Medium-term";
+    return "Long-term";
   };
 
   const getPriority = (pct) => {

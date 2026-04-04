@@ -86,11 +86,11 @@ export function PortfolioPage({ isActive = false, totals = {}, products = [] }) 
             grid: { display: false },
             ticks: {
               color: '#6a9cbf',
-              maxRotation: 0,
-              minRotation: 0,
+              maxRotation: 15,
+              minRotation: 15,
               autoSkip: false,
               font: {
-                size: 9
+                size: 10
               }
             }
           },
@@ -114,7 +114,6 @@ export function PortfolioPage({ isActive = false, totals = {}, products = [] }) 
 
     const ctx = rateChartRef.current.getContext('2d');
 
-    // ✅ Sort LOW → HIGH
     const sorted = [...ProductList].sort(
       (a, b) => toNumber(a.zinterest_rate) - toNumber(b.zinterest_rate)
     );
@@ -129,7 +128,7 @@ export function PortfolioPage({ isActive = false, totals = {}, products = [] }) 
     rateChartInstanceRef.current = new Chart(ctx, {
       type: 'bar',
       data: {
-        labels: sorted.map(p => p.zprd_type),
+        labels: sorted.map(p => `${p.zprd_type} - ${p.zprd_desc || 'Unknown'}`),
         datasets: [
           {
             label: 'Interest Rate (%)',
@@ -196,7 +195,6 @@ export function PortfolioPage({ isActive = false, totals = {}, products = [] }) 
       "Special Mention": "#00acc1"
     };
 
-    // 3️⃣ Build datasets
     const datasets = assetGroups.map(group => ({
       label: group,
       data: products.map(p => {
@@ -210,12 +208,11 @@ export function PortfolioPage({ isActive = false, totals = {}, products = [] }) 
       borderSkipped: false
     }));
 
-    // 4️⃣ Create chart
     assetStackInstanceRef.current = new Chart(ctx, {
       type: 'bar',
       data: {
-        labels: products.map(p => p.zprd_type), // X-axis
-        datasets
+labels: products.map(p => `${p.zprd_type} - ${p.zprd_desc}`),   
+ datasets: datasets     
       },
       options: {
         responsive: true,
@@ -224,7 +221,7 @@ export function PortfolioPage({ isActive = false, totals = {}, products = [] }) 
           legend: {
             position: 'top',
             labels: {
-              font: { size: 9 },
+              font: { size: 6 },
               color: '#2e6090',
               boxWidth: 10
             }
@@ -236,7 +233,8 @@ export function PortfolioPage({ isActive = false, totals = {}, products = [] }) 
             grid: { display: false },
             ticks: {
               color: '#6a9cbf',
-              font: { size: 10 }
+              font: { size: 10 },
+              
             }
           },
           y: {
@@ -302,8 +300,8 @@ export function PortfolioPage({ isActive = false, totals = {}, products = [] }) 
             ticks: {
               color: '#6a9cbf',
               font: { size: 9 },
-              maxRotation: 0,
-              minRotation: 0,
+              maxRotation: 15,
+              minRotation: 15,
               autoSkip: false
             }
           },
@@ -315,8 +313,7 @@ export function PortfolioPage({ isActive = false, totals = {}, products = [] }) 
               callback: (val) => `${val} Cr`
             },
             title: {
-              display: true,
-              text: 'Exposure (Rs Crores)'
+              display: false,
             }
           }
         }
@@ -369,8 +366,8 @@ export function PortfolioPage({ isActive = false, totals = {}, products = [] }) 
             ticks: {
               color: '#6a9cbf',
               font: { size: 9 },
-              maxRotation: 0,
-              minRotation: 0,
+              maxRotation: 15,
+              minRotation: 15,
               autoSkip: false
             }
           },
@@ -538,7 +535,7 @@ export function PortfolioPage({ isActive = false, totals = {}, products = [] }) 
                   <td>{(p.zos_amt / 1e7).toFixed(2)}</td>
                   <td>{p.zinterest_rate}%</td>
                   <td>
-                    {((p.zos_amt / (totals.total_os_amt || 1)) * 100).toFixed(2)}%
+                    {((p.zos_amt / (totals.total_os_amt || 1)) * 100).toFixed(1)}%
                   </td>
                   <td>
                     {p.zinterest_rate >= 10
