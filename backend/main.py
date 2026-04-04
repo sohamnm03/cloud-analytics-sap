@@ -243,24 +243,19 @@ def get_token(req: AuthRequest):
         "env":          f"{req.sap_sid.upper()}/{req.sap_client}",
     }
 
+REACT_APP_URL = "http://localhost:5173/"
 
 @app.post("/session/create")
 def session_create(
     req: SessionCreateRequest,
     authorization: Optional[str] = Header(None),
 ):
-    """
-    Stores raw SAP TRM rows server-side tied to the current JWT.
-    Returns a session_id the frontend uses to fetch data.
-
-    Called by the bootstrapper immediately after /auth/token,
-    before redirecting to the React frontend.
-    """
     claims = decode_jwt(authorization)
 
     _purge_expired_sessions()
 
     session_id = str(uuid.uuid4())
+
     _SESSION_STORE[session_id] = {
         "raw_data":   req.raw_data,
         "dashboard":  req.dashboard,
@@ -268,22 +263,32 @@ def session_create(
         "sap_sid":    claims["sap_sid"],
         "sap_user":   claims["sap_user"],
         "created_at": int(time.time()),
-        "expires_at": claims["exp"],  # session dies with the JWT
+        "expires_at": claims["exp"],
     }
+
+    token = authorization.split(" ")[1]
+
+    frontend_url = (
+        f"{REACT_APP_URL}"
+        f"?token={token}"
+        f"&sid={claims['sap_sid']}"
+        f"&client={claims['sap_client']}"
+        f"&dashboard={req.dashboard}"
+        f"&session_id={session_id}"
+    )
 
     return {
-        "session_id":  session_id,
-        "row_count":   len(req.raw_data),
-        "dashboard":   req.dashboard,
-        "expires_in":  claims["exp"] - int(time.time()),
+        "session_id": session_id,
+        "frontend_url": frontend_url,
+        "row_count": len(req.raw_data),
+        "expires_in": claims["exp"] - int(time.time()),
     }
-
 @app.post("/data/query")
 def data_query(
     req: DataQueryRequest,
-    # authorization: Optional[str] = Header(None),
+    authorization: Optional[str] = Header(None),
 ):
-    # decode_jwt(authorization)
+    claims = decode_jwt(authorization)
 
     # ✅ Get data from request
     resolved_raw_data = None
@@ -303,7 +308,26 @@ def data_query(
             detail="No data provided",
         )
 
-    return calculate_cof_dashboard(req.filters, resolved_raw_data)
+    # Calculate
+    result = calculate_cof_dashboard(req.filters or {}, resolved_raw_data)
+
+    token = authorization.split(" ", 1)[1] if authorization and authorization.startswith("Bearer ") else ""
+
+    frontend_url = (
+        f"{REACT_APP_URL}"
+        f"?token={token}"
+        f"&sid={claims.get('sap_sid', '')}"
+        f"&client={claims.get('sap_client', '')}"
+        f"&dashboard=cof_dashboard"
+
+    )
+
+    result["frontend_url"] = frontend_url
+    result["session_id"] = None
+
+    return result
+
+
 @app.post("/api/query/cof_dashboard")
 def query_cof_dashboard( req: CofDashboardRequest, authorization: Optional[str] = Header(None), ): 
     """Direct COF endpoint — accepts rows inline. JWT required.""" 
