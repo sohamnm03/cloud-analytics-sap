@@ -44,7 +44,7 @@ WHITELISTED_ENVIRONMENTS: dict[str, list[str]] = {
 # In production: replace with Redis via azure-cache-for-redis or similar.
 # ---------------------------------------------------------------------------
 _SESSION_STORE: dict[str, dict] = {}
-
+_TOKEN_SESSION_MAP: dict[str, str] = {}  # Maps JWT jti to session_id for efficient cleanup on token expiry
 
 def _purge_expired_sessions():
     """Remove sessions older than JWT_EXPIRY_SECONDS. Called on every write."""
@@ -131,20 +131,6 @@ def decode_jwt(authorization: Optional[str]) -> dict:
             status_code=401, detail="Token expired — relaunch from SAP")
     except jwt.InvalidTokenError as exc:
         raise HTTPException(status_code=401, detail=f"Invalid token: {exc}")
-
-# def read_json_file():
-#     with open("test-data.json", "r") as f:
-#         rows = json.load(f)
-
-#     print("===== ROWS =====")
-
-#     for i, row in enumerate(rows):
-#         print(f"\n--- Row {i+1} ---")
-#         for key, value in row.items():
-#             print(f"{key} : {value}")
-
-#     return rows
-# read_json_file()
 
 def _extract_cof_rows(payload: Any) -> list:
     if isinstance(payload, list):
@@ -251,8 +237,36 @@ def session_create(
     authorization: Optional[str] = Header(None),
 ):
     claims = decode_jwt(authorization)
-
     _purge_expired_sessions()
+
+    token = authorization.split(" ")[1]
+
+    existing_session_id = _TOKEN_SESSION_MAP.get(token)
+
+    if existing_session_id:
+        session = _SESSION_STORE.get(existing_session_id)
+
+        if session and session["expires_at"] > int(time.time()):
+            session["raw_data"] = req.raw_data
+            session["dashboard"] = req.dashboard
+            session["filters"] = req.filters
+
+            frontend_url = (
+                f"{REACT_APP_URL}"
+                f"?token={token}"
+                f"&sid={claims['sap_sid']}"
+                f"&client={claims['sap_client']}"
+                f"&dashboard={req.dashboard}"
+                f"&session_id={existing_session_id}"
+            )
+
+            return {
+                "session_id": existing_session_id,
+                "frontend_url": frontend_url,
+                "row_count": len(req.raw_data),
+                "expires_in": session["expires_at"] - int(time.time()),
+                "reused": True   # optional flag
+            }
 
     session_id = str(uuid.uuid4())
 
@@ -266,7 +280,7 @@ def session_create(
         "expires_at": claims["exp"],
     }
 
-    token = authorization.split(" ")[1]
+    _TOKEN_SESSION_MAP[token] = session_id
 
     frontend_url = (
         f"{REACT_APP_URL}"
@@ -282,7 +296,9 @@ def session_create(
         "frontend_url": frontend_url,
         "row_count": len(req.raw_data),
         "expires_in": claims["exp"] - int(time.time()),
+        "reused": False
     }
+
 @app.post("/data/query")
 def data_query(
     req: DataQueryRequest,
@@ -290,7 +306,6 @@ def data_query(
 ):
     claims = decode_jwt(authorization)
 
-    # ✅ Get data from request
     resolved_raw_data = None
 
     if req.session_id:
@@ -327,15 +342,6 @@ def data_query(
 
     return result
 
-
-@app.post("/api/query/cof_dashboard")
-def query_cof_dashboard( req: CofDashboardRequest, authorization: Optional[str] = Header(None), ): 
-    """Direct COF endpoint — accepts rows inline. JWT required.""" 
-    decode_jwt(authorization) 
-    payload = req.model_dump()
-    rows = _extract_cof_rows(payload)
-    filters = _extract_cof_filters(payload)
-    return calculate_cof_dashboard(filters, rows)
 # ---------------------------------------------------------------------------
 # Calculation Engine
 # ---------------------------------------------------------------------------
@@ -630,7 +636,8 @@ def calculate_cof_dashboard(filters: dict, raw_data=None):
         p["zwt_avg_amt"] += wt_avg
         p["zavg_funds"] += avg_f
         p["zwt_int_amt"] += wt_int 
-        p["zexposure"] = round(p["zsanction_amt"] - p["zos_amt"], 2)     
+        p["zexposure"] = round(p["zsanction_amt"] - p["zos_amt"], 2)    
+        p["zdrawdown_rate"] = round((p["zos_amt"] / p["zsanction_amt"]) * 100, 2) if p["zsanction_amt"] > 0 else 0.0
         p["zinterest_ratio"] = round((p["zinterest_due"] / p["zos_amt"]) * 100, 2) if p["zos_amt"] > 0 else 0.0
         if avg_eir:
             p["zopen_eir_sum"] += open_eir

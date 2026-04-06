@@ -50,8 +50,11 @@ export function OverviewPage({ isActive = false, totals = {}, products = [], bor
     const ctx = chartRef.current.getContext('2d');
     const gradient = ctx.createLinearGradient(0, 0, 0, 300);
 
-    gradient.addColorStop(0, '#92effb');   // light teal top
-    gradient.addColorStop(1, '#92c4fd');
+    gradient.addColorStop(0, 'rgba(166, 240, 250, 0.9)');
+
+    gradient.addColorStop(0.5, 'rgba(38, 198, 218, 0.5)');
+
+    gradient.addColorStop(1, 'rgba(38, 198, 218, 0.15)');
     const top9 = prodList.slice(0, 9);
 
     chartInstanceRef.current = new Chart(ctx, {
@@ -62,10 +65,10 @@ export function OverviewPage({ isActive = false, totals = {}, products = [], bor
           label: mode.replace(/_/g, ' ').toUpperCase(),
           data: top9.map(p => getValueByMode(p, mode) / 1e7),
           backgroundColor: gradient,
-          borderColor: '#2563eb',
           borderWidth: 0,
-          borderRadius: 8,
-          barThickness: 40,
+          borderRadius: 12,
+          barThickness: 36,
+          borderSkipped: false
         }],
       },
       options: {
@@ -78,7 +81,7 @@ export function OverviewPage({ isActive = false, totals = {}, products = [], bor
         scales: {
           y: {
             grid: {
-              color: 'rgba(209, 226, 243, 0.4)',  // 👈 light gridlines
+              color: 'rgba(209, 226, 243, 0.4)',  
               lineWidth: 1,
               drawBorder: false
             },
