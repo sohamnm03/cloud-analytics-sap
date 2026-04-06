@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-// import fsLogo from '../../images/FSlogo.png';
-import logo from '../../images/logo.png';
+import fsLogo from '../../images/FSlogo.png';
+// import logo from '../../images/logo.png';
 
 type DashboardHeaderProps = {
   activePage: string;
@@ -176,25 +176,15 @@ export function DashboardHeader({ activePage, onPageChange }: DashboardHeaderPro
       <div className="logo">
         <div className="logo-icon">
           <img
-            src={logo}
+            src={fsLogo}
             alt="Logo"
             style={{ width: '100%', height: '100%', objectFit: 'contain' }}
           />
         </div>
         <div>
-          <div className="logo">NEXUS CREDIT </div>
-          <div className="logo-sub"> Loan Portfolio Analytics — Global Credit Co <br /> SAP S/4HANA
-            <span
-              style={{
-                background: "var(--blue-dark)",
-                color: "#fff",
-                fontSize: "0.55rem",
-                padding: "2px 7px",
-                borderRadius: "20px",
-                letterSpacing: "0.08em",
-                verticalAlign: "middle",
-              }}
-            >v6.0</span>          </div>
+          <div className="logo">NIIF EXPOSURE DASHBOARD </div>
+          <div className="logo-sub"> A Product by Fourth Signal
+         </div>
         </div>
       </div>
       <nav className="header-nav">
